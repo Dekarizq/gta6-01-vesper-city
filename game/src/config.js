@@ -1,61 +1,27 @@
-// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
-// the renderer scales it to the window, so no rule below depends on the screen size.
-
-export const FIELD = { width: 1280, height: 720, groundY: 664 };
-
-/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
+// Vesper City: Neon Rain — shared constants and tuning.
+// Original game. No Rockstar names, assets or map. All art is procedural.
+export const WORLD = {
+  block: 44,          // size of one city block (world units)
+  blocks: 9,          // blocks across (city spans blocks*block + roads)
+  road: 10,           // road width
+  stormDays: 7,       // hurricane countdown in days
+  dayLength: 240,     // seconds per in-game day
+};
 export const STEP = 1 / 60;
-
-export const PLAYER = {
-  width: 72,
-  height: 24,
-  speed: 560,
-  invulnerable: 1.5,
-};
-
-export const LIVES = 3;
-
-export const BLOCK = {
-  minWidth: 40,
-  maxWidth: 110,
-  height: 36,
-  speed: 240,
-  speedPerLevel: 30,
-  speedJitter: 90,
-  interval: 0.55,
-  intervalScale: 0.88,
-  minInterval: 0.14,
-  dodgePoints: 1,
-};
-
-export const COIN = {
-  size: 24,
-  speed: 190,
-  speedPerLevel: 14,
-  interval: 1.4,
-  intervalJitter: 0.8,
-  points: 10,
-};
-
-/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
-export const LEVEL = { seconds: 12, max: 12 };
-
-/** How many falling things can exist at once; the pool is allocated once, at boot. */
-export const POOL_SIZE = 64;
-
-export const PALETTE = {
-  backdrop: '#11141b',
-  sky: '#1b1f2a',
-  ground: '#2a3040',
-  player: '#4fc3f7',
-  block: '#e5534b',
-  coin: '#f2c94c',
-  panel: '#252b38',
-  text: '#eef1f5',
-  muted: '#8b93a3',
-};
-
-export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-/** Where the best score is kept between visits (this browser only). */
-export const BEST_KEY = 'block-dodger.best';
+export const PLAYER = { walkSpeed: 7, sprintSpeed: 11, health: 100, radius: 0.9 };
+export const WANTED_MAX = 5;
+export const SAVE_KEY = 'vesper-city-neon-rain-save-v1';
+export const CAR_TYPES = [
+  { id: 'sedan', name: 'Vesper S', color: [0.72, 0.18, 0.24], top: 24, accel: 16, brake: 30, grip: 2.6 },
+  { id: 'coupe', name: 'Neon GT', color: [0.15, 0.55, 0.95], top: 33, accel: 22, brake: 34, grip: 3.1 },
+  { id: 'van', name: 'Hauler XL', color: [0.9, 0.72, 0.18], top: 20, accel: 12, brake: 26, grip: 2.2 },
+  { id: 'taxi', name: 'Night Cab', color: [0.95, 0.8, 0.1], top: 26, accel: 17, brake: 30, grip: 2.7 },
+];
+export const DISTRICTS = [
+  { name: 'Neon Mile', color: '#ff2e88' },
+  { name: 'Harbor Docks', color: '#22d3ee' },
+  { name: 'Old Vesper', color: '#f59e0b' },
+  { name: 'Glass Quarter', color: '#a78bfa' },
+  { name: 'Rainmarket', color: '#34d399' },
+];
+export const NEON = ['#ff2e88', '#22d3ee', '#f59e0b', '#a78bfa', '#34d399', '#ff5c5c', '#7c3aed'];

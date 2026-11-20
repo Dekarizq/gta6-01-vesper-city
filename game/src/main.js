@@ -1,134 +1,168 @@
-// Boot and the one loop: input is read every frame, the world advances in fixed 1/60 s steps
-// (several in a slow frame, none in a fast one), and the renderer paints what is there. The game
-// moves between four screens: title, play, paused and game over.
-//
-// ?seed=N fixes the falling pattern. ?shot=start|play|end (with &seed=N) stages that scene
-// instead of running the loop, paints it twice and sets window.__shotReady for a screenshot.
-import { BEST_KEY, LIVES, STEP } from './config.js';
+// main.js — boot and the one loop for Vesper City: Neon Rain.
+// ?shot=start|chase|street|mission stages a deterministic scene and sets
+// window.__shotReady once it has settled, for screenshots. Otherwise the game
+// runs from the title screen: start, drive, steal, run missions, outrun the
+// VCPD, and save — all offline, all procedural, no network requests.
+import { STEP, SAVE_KEY } from './config.js';
 import { createRandom } from './random.js';
-import { createWorld, EVENT_HIT, EVENT_OVER } from './world.js';
-import { ACTION_CONFIRM, ACTION_PAUSE, createInput } from './input.js';
-import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+import { createGame, SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSED, SCREEN_DEAD } from './world.js';
+import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM } from './input.js';
+import { createEngine, chaseCamera, collideCamera } from './engine.js';
+import { createHud } from './hud.js';
+import { createAudio } from './audio.js';
+import { hasSave, saveGame, loadGame } from './save.js';
 import { stageShot } from './shots.js';
-
-/** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
-const MAX_FRAME = 0.25;
 
 const params = new URLSearchParams(window.location.search);
 const shot = params.get('shot');
 const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
-const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
+const seed = Number.isInteger(seedParam) ? seedParam : 20261120;
 
 const canvas = document.getElementById('game');
 const status = document.getElementById('status');
-const world = createWorld(createRandom(seed));
-const renderer = createRenderer(canvas);
+const rng = createRandom(seed);
+const api = createGame(rng);
+const game = api.game;
+const engine = createEngine(canvas, game.city);
+const hud = createHud(game.city);
+const audio = createAudio();
+const input = createInput();
 
-function readBest() {
-  try {
-    return Number.parseInt(window.localStorage.getItem(BEST_KEY) ?? '0', 10) || 0;
-  } catch {
-    return 0;
+// Debug/test hook (harmless in play): lets automated playtests drive the real game.
+window.__vesper = { api, game, startNew, continueSaved, saveGame: () => saveGame(game) };
+
+let screen = SCREEN_TITLE;
+let titleOrbit = 0;
+let autosaveTimer = 0;
+let shotFrames = 0;
+
+function announce(message) { status.textContent = message; }
+
+function startNew() {
+  api.reset(true);
+  screen = SCREEN_PLAY;
+  hud.hideTitle(); hud.hidePause(); hud.hideDead();
+  audio.unlock();
+  hud.message('Welcome to Vesper City. Press Q to start your first mission.', 6);
+  announce('Playing Vesper City.');
+}
+
+function continueSaved() {
+  const data = loadGame();
+  if (data) api.applySave(data);
+  screen = SCREEN_PLAY;
+  hud.hideTitle(); hud.hidePause(); hud.hideDead();
+  audio.unlock();
+  hud.message('Saved game loaded. The storm is still coming.', 5);
+}
+
+function pauseGame() {
+  screen = SCREEN_PAUSED;
+  hud.showPause();
+  announce('Paused.');
+}
+function resumeGame() {
+  screen = SCREEN_PLAY;
+  hud.hidePause();
+  announce('Playing.');
+}
+function quitToTitle() {
+  saveGame(game);
+  screen = SCREEN_TITLE;
+  hud.hidePause(); hud.hideDead();
+  hud.showTitle(hasSave());
+  announce('Title screen.');
+}
+
+hud.bindButtons({
+  start: startNew,
+  continue: continueSaved,
+  resume: resumeGame,
+  save: () => { saveGame(game); hud.message('Game saved.', 3); },
+  quit: quitToTitle,
+  respawn: () => { api.respawn(); screen = SCREEN_PLAY; hud.hideDead(); },
+});
+
+function handleActions() {
+  const a = input.takeActions();
+  if (screen === SCREEN_TITLE) {
+    if (a & ACT_CONFIRM) startNew();
+    return;
+  }
+  if (screen === SCREEN_DEAD) {
+    if (a & ACT_CONFIRM) { api.respawn(); screen = SCREEN_PLAY; hud.hideDead(); }
+    return;
+  }
+  if (a & ACT_PAUSE) {
+    if (screen === SCREEN_PLAY) pauseGame();
+    else if (screen === SCREEN_PAUSED) resumeGame();
+    return;
+  }
+  if (screen !== SCREEN_PLAY) return;
+  if (a & ACT_ENTER) api.enterCar();
+  if (a & ACT_SHOOT) { api.fireWeapon(); audio.unlock(); audio.shot(); }
+  if (a & ACT_MISSION) api.startMission();
+  if (a & ACT_RESTART) api.restartMission();
+  if (a & ACT_MAP) { game.mapOpen = !game.mapOpen; hud.toggleMap(game.mapOpen); }
+  if (a & ACT_MUTE) { const m = audio.toggleMute(); hud.message(m ? 'Sound muted.' : 'Sound on.', 2); }
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - (frame.last || now)) / 1000 || STEP);
+  frame.last = now;
+  handleActions();
+  if (screen === SCREEN_PLAY) {
+    api.step(dt, input, audio);
+    if (game.screen === SCREEN_DEAD) { screen = SCREEN_DEAD; hud.showDead(); }
+    autosaveTimer += dt;
+    if (autosaveTimer > 20) { autosaveTimer = 0; saveGame(game); }
+  } else if (screen === SCREEN_TITLE) {
+    titleOrbit += dt * 0.05;
+  }
+  // Camera.
+  const p = api.player;
+  let cam;
+  if (screen === SCREEN_TITLE) {
+    const r = 95;
+    cam = {
+      eye: [Math.sin(titleOrbit) * r, 42, Math.cos(titleOrbit) * r],
+      target: [0, 18, 0],
+    };
+  } else {
+    cam = collideCamera(chaseCamera(p.x, p.z, p.angle, Math.abs(p.speed || 0), p.inCar), game.city.buildings);
+  }
+  const boxes = api.collectBoxes(game.time);
+  engine.draw(cam, boxes, game.time);
+  if (screen !== SCREEN_TITLE) hud.update(api.hudState(), dt);
+  if (game.msg) { hud.message(game.msg, 4); game.msg = null; }
+  if (shot) {
+    shotFrames += 1;
+    // 30 frames is enough for the scene to settle (headless SwiftShader is slow).
+    if (shotFrames > 30 && !window.__shotReady) window.__shotReady = true;
   }
 }
 
-function saveBest(value) {
-  try {
-    window.localStorage.setItem(BEST_KEY, String(value));
-  } catch {
-    // Storage can be off (private windows): the best score then lasts this visit only.
-  }
-}
-
-function runShot(name) {
-  const scene = stageShot(name, world);
-  let painted = 0;
-  function paint() {
-    renderer.draw(world.state, scene.screen, scene.best);
-    painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
-    else window.__shotReady = true;
-  }
-  requestAnimationFrame(paint);
-}
-
-function runGame() {
-  const input = createInput(canvas);
-  let screen = SCREEN_TITLE;
-  let best = readBest();
-  let accumulator = 0;
-  let last = performance.now();
-
-  // Screen readers (and anyone watching the page's text) hear the screen changes and each hit.
-  function announce(message) {
-    status.textContent = message;
-  }
-
-  function startGame() {
-    world.reset();
-    accumulator = 0;
+if (shot) {
+  // Shot mode: stage the scene, hide the title unless it is the start shot,
+  // and run the live loop so traffic, rain and the helicopter move.
+  stageShot(shot, api);
+  if (shot === 'start') {
+    screen = SCREEN_TITLE;
+    hud.showTitle(false);
+  } else {
     screen = SCREEN_PLAY;
-    announce(`Playing. ${LIVES} lives.`);
+    hud.hideTitle();
+    // Drive the chase/mission scenes forward so cops and the helicopter appear.
+    // The chase gets a short sim and no throttle so the staged cruisers stay
+    // in frame ahead; other scenes drive forward.
+    const simSteps = shot === 'chase' ? 60 : 240;
+    const simInput = { forward: () => (shot === 'chase' ? 0 : 1), steer: () => 0, sprint: () => false, handbrake: () => false };
+    for (let i = 0; i < simSteps; i += 1) api.step(STEP, simInput, null);
   }
-
-  function endGame() {
-    screen = SCREEN_OVER;
-    if (world.state.score > best) {
-      best = world.state.score;
-      saveBest(best);
-    }
-    announce(`Game over. Score ${world.state.score}. Best ${best}.`);
-  }
-
-  function handleActions() {
-    const actions = input.takeActions();
-    if (actions & ACTION_CONFIRM && (screen === SCREEN_TITLE || screen === SCREEN_OVER)) startGame();
-    else if (actions & ACTION_PAUSE && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    } else if (actions & (ACTION_PAUSE | ACTION_CONFIRM) && screen === SCREEN_PAUSED) {
-      screen = SCREEN_PLAY;
-      announce('Playing.');
-    }
-  }
-
-  function step() {
-    if (screen === SCREEN_TITLE) {
-      world.step(STEP, 0, true);
-      return;
-    }
-    const events = world.step(STEP, input.direction(), false);
-    if (events & EVENT_OVER) endGame();
-    else if (events & EVENT_HIT) announce(world.state.lives === 1 ? 'Hit. 1 life left.' : `Hit. ${world.state.lives} lives left.`);
-  }
-
-  function frame(now) {
-    requestAnimationFrame(frame);
-    accumulator += Math.min((now - last) / 1000, MAX_FRAME);
-    last = now;
-    handleActions();
-    if (screen === SCREEN_TITLE || screen === SCREEN_PLAY) {
-      while (accumulator >= STEP && (screen === SCREEN_TITLE || screen === SCREEN_PLAY)) {
-        step();
-        accumulator -= STEP;
-      }
-    } else {
-      accumulator = 0;
-    }
-    renderer.draw(world.state, screen, best);
-  }
-
-  // Leaving the tab pauses a running game rather than letting blocks fall unseen.
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    }
-  });
-
-  announce('Block Dodger. Press Space or click to start.');
+  requestAnimationFrame(frame);
+} else {
+  hud.showTitle(hasSave());
+  announce('Vesper City: Neon Rain. Press Enter or click Start Engine to play.');
   requestAnimationFrame(frame);
 }
-
-if (shot) runShot(shot);
-else runGame();
