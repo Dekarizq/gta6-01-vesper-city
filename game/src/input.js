@@ -25,13 +25,14 @@ export const ACT_WEAPON4 = 8192;
 export const ACT_JOB = 16384;
 export const ACT_GPS = 32768;
 export const ACT_SLOT = 65536;
+export const ACT_HUD = 131072; // v5: H hides the HUD for a clean screenshot
 // Wheel: hold Q longer than this (ms) and it is a wheel hold, not a tap.
 export const WHEEL_HOLD_MS = 350;
 
 const KEYMAP = {
   KeyE: ACT_ENTER, KeyF: ACT_SHOOT, KeyP: ACT_PAUSE, KeyM: ACT_MAP,
   KeyT: ACT_RESTART, KeyU: ACT_MUTE, KeyG: ACT_GARAGE, KeyR: ACT_RADIO,
-  KeyJ: ACT_JOB, KeyL: ACT_GPS, KeyK: ACT_SLOT,
+  KeyJ: ACT_JOB, KeyL: ACT_GPS, KeyK: ACT_SLOT, KeyH: ACT_HUD,
   Space: ACT_CONFIRM, Enter: ACT_CONFIRM,
 };
 // Q is NOT in KEYMAP: it is handled specially (tap = mission, hold = wheel).

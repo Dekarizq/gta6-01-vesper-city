@@ -167,6 +167,15 @@ export function wheelBoxes(wheel, player, time) {
     x: player.x, y: 2.6, z: player.z, w: 0.7, h: 0.7, d: 0.7,
     color: [1, 0.72, 0.2], yaw: time,
   });
+  // v5: a thin gold ring around the hub, so the wheel reads as a
+  // wheel even from the chase camera behind the player.
+  for (let i = 0; i < 4; i += 1) {
+    const a = (i * Math.PI) / 2 + time * 0.5;
+    boxes.push({
+      x: player.x + Math.sin(a) * 1.5, y: 2.6, z: player.z + Math.cos(a) * 1.5,
+      w: 0.35, h: 0.35, d: 0.35, color: [0.95, 0.8, 0.35], yaw: 0,
+    });
+  }
   return boxes;
 }
 

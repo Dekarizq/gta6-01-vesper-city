@@ -27,6 +27,14 @@ export function createRandom(seed) {
   };
 }
 export function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+// v5: a normal-distributed value (Box-Muller on the seeded rng) so
+// crowd speeds cluster around a natural average instead of spreading
+// flat across a range — walkers mostly stroll, a few hurry.
+export function gauss(rng) {
+  const u = Math.max(1e-9, rng.next());
+  const v = rng.next();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
 export function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 export function lerp(a, b, t) { return a + (b - a) * t; }
 export function dist2(ax, az, bx, bz) { const dx = ax - bx, dz = az - bz; return dx * dx + dz * dz; }

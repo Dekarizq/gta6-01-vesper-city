@@ -32,6 +32,12 @@ import { createWeaponWheel, openWheel, closeWheel, wheelMouse, wheelSlots, wheel
 import { createSpikeStrips, updateStrips, stepFlatTyres, repairTyre, nearestStrip, stripBoxes, spikesLoad } from './spikestrip.js';
 import { createSaveSlots, saveToSlot, loadFromSlot, listSlots, autosave, cycleSlot, slotLabel, slotsLoad } from './saveslots.js';
 import { FINALE_BONUS } from './missions-extra.js';
+// v5 systems: the two new districts and the visual overhaul.
+import { createDistricts, stepDistricts, districtBoxes, districtNameAt, districtsLoad } from './districts.js';
+import { decorateCity, visualsBoxes } from './visuals.js';
+import { districtAt } from './city.js';
+import { muzzleColor } from './combat.js';
+import { gpsLabelWithDistrict } from './gps.js';
 
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -40,6 +46,11 @@ export const SCREEN_DEAD = 'dead';
 
 export function createGame(rng) {
   const city = generateCity(rng);
+  // v5: decorate the city (facades, lamps, trees, billboards) BEFORE
+  // the engine builds its static buffer, and create the two new
+  // districts (Marina + Old Town) that live on top of the grid.
+  decorateCity(city, rng);
+  const districts = createDistricts(city);
   const coast = createCoast(city);
   const missions = buildMissions(city, coast);
   const coins = createCollectibles();
@@ -69,10 +80,15 @@ export function createGame(rng) {
     wheel: createWeaponWheel(),
     spikes: null,
     saveSlots: createSaveSlots(),
+    // v5: the two new districts, stepped by the world loop.
+    districts,
   };
   game.spikes = game.police.spikes;
-  game.traffic = spawnTraffic(rng, 16, player.x, player.z);
-  game.peds = spawnPedestrians(rng, 26, player.x, player.z);
+  // v5: denser streets — 22 traffic cars and 36 pedestrians instead
+  // of 16 and 26, plus the five new car models, so the roads feel
+  // busy instead of empty between missions.
+  game.traffic = spawnTraffic(rng, 22, player.x, player.z);
+  game.peds = spawnPedestrians(rng, 36, player.x, player.z);
   game.peds.push(...spawnCrew(rng, garageLandmark));
 
   function reset(newGame) {
@@ -97,8 +113,8 @@ export function createGame(rng) {
     game.saveSlots = createSaveSlots();
     coast.time = 0; coast.tide = 0;
     game.stats = { carsStolen: 0, missionsDone: 0, kills: 0, explosions: 0, upgradesBought: 0, jobsDone: 0, racesWon: 0, spikesHit: 0 };
-    game.traffic = spawnTraffic(rng, 16, player.x, player.z);
-    game.peds = spawnPedestrians(rng, 26, player.x, player.z);
+    game.traffic = spawnTraffic(rng, 22, player.x, player.z);
+    game.peds = spawnPedestrians(rng, 36, player.x, player.z);
     game.peds.push(...spawnCrew(rng, garageLandmark));
     if (newGame) game.screen = SCREEN_PLAY;
   }
@@ -130,8 +146,10 @@ export function createGame(rng) {
     // Spike totals are stats, not live strips: a load never restores
     // a strip that was on the road when the game was saved.
     if (data.spikes) spikesLoad(game.police.spikes, data.spikes);
-    game.traffic = spawnTraffic(rng, 16, player.x, player.z);
-    game.peds = spawnPedestrians(rng, 26, player.x, player.z);
+    // v5: restore the districts' clock (lighthouse beam, sailboats).
+    if (data.districts) districtsLoad(game.districts, data.districts);
+    game.traffic = spawnTraffic(rng, 22, player.x, player.z);
+    game.peds = spawnPedestrians(rng, 36, player.x, player.z);
     game.peds.push(...spawnCrew(rng, garageLandmark));
     game.screen = SCREEN_PLAY;
   }
@@ -408,6 +426,15 @@ export function createGame(rng) {
     stepCombat(game.combat, dt, p, game.police);
     // --- v4 coast life: the tide breathes, boats bob, surfers paddle.
     stepCoast(coast, dt, p);
+    // v5: gulls cry over the marina and the coast, at most once
+    // every eight seconds, so the sea sounds alive without spamming.
+    if (isOnCoast(coast, p.x, p.z) && game.time - (game.lastGull || 0) > 8) {
+      game.lastGull = game.time;
+      if (audio && audio.gull) audio.gull();
+    }
+    // --- v5 districts life: sailboats cross the sea, the lighthouse
+    // beam turns, chimney smoke rises over Old Town.
+    stepDistricts(game.districts, dt);
     // --- v4 spike strips: check the player car and traffic against
     // live strips; a hit bursts the tyres and the HUD warns.
     {
@@ -600,9 +627,14 @@ export function createGame(rng) {
     boxes.push(...gpsBoxes(game.gps, time));
     boxes.push(...stripBoxes(game.police.spikes, time, game.time));
     boxes.push(...wheelBoxes(game.wheel, player, time));
+    // v5: the two new districts (marina yachts, cranes, lighthouse,
+    // old-town market, church, clotheslines) and the living sky
+    // (clouds, birds, sea glints) on top of everything else.
+    boxes.push(...districtBoxes(game.districts, time));
+    boxes.push(...visualsBoxes(game, time));
     if (game.combat.muzzle > 0) {
       const mw = game.combat.lastWeapon === 'shotgun' ? 1.1 : 0.6;
-      boxes.push({ x: p.x + Math.sin(p.angle) * 1.2, y: 1.0, z: p.z + Math.cos(p.angle) * 1.2, w: mw, h: mw, d: mw, color: [1, 0.9, 0.4], yaw: 0 });
+      boxes.push({ x: p.x + Math.sin(p.angle) * 1.2, y: 1.0, z: p.z + Math.cos(p.angle) * 1.2, w: mw, h: mw, d: mw, color: muzzleColor(game.combat.lastWeapon), yaw: 0 });
     }
     return boxes;
   }
@@ -653,12 +685,18 @@ export function createGame(rng) {
       carsStolen: game.stats.carsStolen,
       // v4 HUD state: coast, jobs, GPS, save slots, job totals.
       coast: isOnCoast(coast, player.x, player.z) ? coastNameAt(coast, player.x, player.z) : null,
+      // v5: the district name the HUD shows — Marina District and Old
+      // Town win over the grid district, the coast wins over both.
+      district: districtNameAt(game.districts, player.x, player.z)
+        || (isOnCoast(coast, player.x, player.z) ? coastNameAt(coast, player.x, player.z) : null)
+        || districtAt(player.x, player.z).name,
       coastPoint: nearestCoastPoint(coast, player.x, player.z),
       job,
       jobsSummary: jobsSummary(game.jobs),
       gps: {
         enabled: game.gps.enabled,
-        label: gpsLabel(game.gps, player.x, player.z, player.angle),
+        label: gpsLabelWithDistrict(game.gps, player.x, player.z, player.angle,
+          districtNameAt(game.districts, player.x, player.z) || districtAt(player.x, player.z).name),
         remaining: gpsRemaining(game.gps, player.x, player.z),
         nextTurn: gpsNextTurn(game.gps, player.x, player.z, player.angle),
         route: game.gps.route,
@@ -688,7 +726,7 @@ export function createGame(rng) {
   }
 
   return {
-    game, player, city, coast, reset, applySave, startMission, restartMission,
+    game, player, city, coast, districts, reset, applySave, startMission, restartMission,
     enterCar, fireWeapon, changeWeapon, step, collectBoxes, hudState, respawn,
     buyGarageUpgrade, cycleGarageUpgrade, nextRadio,
     // v4: side jobs, GPS, save slots, weapon wheel.

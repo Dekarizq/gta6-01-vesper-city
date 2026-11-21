@@ -53,7 +53,7 @@ export function createHud(city) {
         J — side job (taxi / delivery / race) &nbsp;·&nbsp; L — GPS route &nbsp;·&nbsp; K — save slot &nbsp;·&nbsp; Space — handbrake &nbsp;·&nbsp; Shift — sprint &nbsp;·&nbsp; T — restart mission &nbsp;·&nbsp; M — map &nbsp;·&nbsp; P — pause</div>
         <button id="start-btn">START ENGINE</button>
         <button id="continue-btn">CONTINUE SAVED GAME</button>
-        <div id="title-foot">12 story missions · 6 car types · Sunset Garage upgrades incl. NITRO · 4 radio stations · respect ranks &amp; crew · wanted 0–6 · spike strips · named VCPD units, roadblocks &amp; CONDOR-1 helicopter · cars that burn &amp; explode · Sunset Beach coast with pier, boats &amp; side jobs · GPS route · 3 save slots</div>
+        <div id="title-foot">12 story missions · 11 car types · Sunset Garage upgrades incl. NITRO &amp; CHROME · 5 radio stations · respect ranks &amp; crew · wanted 0–6 · spike strips · named VCPD units, roadblocks &amp; CONDOR-1 helicopter · cars that burn &amp; explode · Sunset Beach coast with pier, boats &amp; side jobs · Marina District &amp; Old Town · GPS route · 3 save slots</div>
       </div>
     </div>
     <div id="pause-screen"><h2>PAUSED</h2><p>WASD drive · E steal car · F shoot · 1/2/3 weapons · G garage · R radio · Q mission · T restart mission · U mute</p>
@@ -146,6 +146,8 @@ export function createHud(city) {
     showDead() { $('dead-screen').style.display = 'flex'; },
     hideDead() { $('dead-screen').style.display = 'none'; },
     toggleMap(show) { $('map-overlay').style.display = show ? 'flex' : 'none'; },
+    // v5: H hides the whole HUD (clean screenshot), H again brings it back.
+    toggleHud() { root.classList.toggle('hud-off'); return root.classList.contains('hud-off'); },
     isMapOpen() { return $('map-overlay').style.display === 'flex'; },
     bindButtons(handlers) {
       $('start-btn').onclick = handlers.start;
@@ -202,7 +204,7 @@ export function createHud(city) {
       const day = Math.min(7, 1 + Math.floor(state.elapsed / 240));
       const left = Math.max(0, 7 - day + 1);
       $('hud-storm').textContent = `⛈ HURRICANE IN ${left} DAY${left === 1 ? '' : 'S'} · DAY ${day}/7 · 18:48`;
-      $('hud-district').textContent = districtAt(state.x, state.z).name + ' · Vesper City';
+      $('hud-district').textContent = (state.district || districtAt(state.x, state.z).name) + ' · Vesper City';
       $('hud-radio').textContent = '♪ ' + (state.radio || '');
       const m = state.objective;
       if (m) {

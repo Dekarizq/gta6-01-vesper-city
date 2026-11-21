@@ -6,7 +6,9 @@
 // v4: the south shore is a real district now — Sunset Beach, with the pier,
 // the boardwalk and the boat dock as landmarks the GPS and the coast
 // missions navigate to, and more neon signs on the towers so the city
-// glows harder at golden hour.
+// glows harder at golden hour. v5: two more districts with their own
+// palettes — the Marina District (white/teal, south-east) and Old Town
+// (brick/cream, north band) — plus marina and old-town landmarks.
 import { WORLD, DISTRICTS, GOLD, WINDOW_STRIP, SUN } from './config.js';
 
 export function citySize() {
@@ -51,7 +53,14 @@ export function districtAt(x, z) {
   const fx = (x + size / 2) / size;
   const fz = (z + size / 2) / size;
   // v4: past the south road line is the beach, not the docks.
+  // v5: the south-east corner by the sea is the Marina District, and
+  // the north band is Old Town — both win over the grid districts.
+  // Marina is checked BEFORE the beach: the marina quay sits on the
+  // same south strip as the sand, and its x-range is what tells them
+  // apart (east of fx 0.72 is quay, west of it is beach).
+  if (fz > 0.82 && fx > 0.72) return DISTRICTS[6]; // Marina District
   if (fz > 0.94) return DISTRICTS[5]; // Sunset Beach (sand, pier, sea)
+  if (fz < 0.2 && fx > 0.25 && fx < 0.75) return DISTRICTS[7]; // Old Town
   if (fz > 0.82) return DISTRICTS[1]; // Harbor Docks (south)
   if (fx > 0.36 && fx < 0.64 && fz > 0.3 && fz < 0.7) return DISTRICTS[3]; // Glass Quarter downtown
   if (fx < 0.3 && fz < 0.4) return DISTRICTS[0]; // Sunset Mile NW
@@ -136,7 +145,17 @@ export function generateCity(rng) {
           : rng.range(9, 30);
         const palette = PALETTES[rng.int(0, PALETTES.length - 1)];
         const shade = rng.range(0.9, 1.15);
-        const base = [palette[0] * shade, palette[1] * shade, palette[2] * shade];
+        // v5: Marina towers are white and teal, Old Town towers are
+        // brick and cream — the district palettes from textures.js
+        // would be the source of truth, but the city generator only
+        // carries the warm GOLD set, so the two new districts pick
+        // their own bases here instead of a random warm one.
+        const districtName = districtAt(cx, cz).name;
+        const base = districtName === 'Marina District'
+          ? [[0.92, 0.9, 0.84], [0.75, 0.85, 0.85], [0.55, 0.7, 0.75]][rng.int(0, 2)]
+          : districtName === 'Old Town'
+            ? [[0.58, 0.3, 0.22], [0.7, 0.52, 0.34], [0.8, 0.68, 0.5]][rng.int(0, 2)]
+            : [palette[0] * shade, palette[1] * shade, palette[2] * shade];
         const strip = WINDOW_STRIP[rng.int(0, WINDOW_STRIP.length - 1)];
         buildings.push({ x: cx + ox, z: cz + oz, w, d, h, color: base, district: districtAt(cx, cz).name, strip });
         // A bright sign on the tallest face of some buildings. v4: more
@@ -193,6 +212,9 @@ export function generateCity(rng) {
     { id: 'boardwalk', name: 'Sunset Boardwalk', x: 60, z: size / 2 + 20 },
     { id: 'boatdock', name: 'Boat Dock', x: 110, z: size / 2 + 56 },
     { id: 'beach', name: 'Sunset Beach', x: 0, z: size / 2 + 18 },
+    // v5: the two new districts get landmarks the GPS can name.
+    { id: 'marina', name: 'Marina District', x: 180, z: size / 2 - 10 },
+    { id: 'oldtown', name: 'Old Town', x: 0, z: -size / 2 + 50 },
   ];
   return { size, lines, buildings, signs, palms, umbrellas, landmarks };
 }

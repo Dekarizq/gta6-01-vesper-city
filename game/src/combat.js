@@ -24,6 +24,15 @@ export function currentWeapon(combat) {
   return WEAPONS[combat.weapon];
 }
 
+// v5: the muzzle flash colour belongs to the weapon — gold for the
+// shotgun, white-hot for the pistol, blue-white for the SMG.
+export function muzzleColor(weaponId) {
+  if (weaponId === 'shotgun') return [1, 0.72, 0.2];
+  if (weaponId === 'smg') return [0.75, 0.9, 1];
+  if (weaponId === 'pistol') return [1, 0.95, 0.8];
+  return [1, 0.9, 0.4];
+}
+
 export function switchWeapon(combat, index) {
   if (index < 0 || index >= WEAPONS.length) return false;
   combat.weapon = index;

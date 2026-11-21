@@ -15,6 +15,7 @@ import { coastSave } from './coast.js';
 import { gpsSave } from './gps.js';
 import { wheelSave } from './weapon-wheel.js';
 import { spikesSave } from './spikestrip.js';
+import { districtsSave } from './districts.js';
 
 export function hasSave() {
   try { return !!window.localStorage.getItem(SAVE_KEY); } catch { return false; }
@@ -40,6 +41,10 @@ export function buildSaveData(state) {
     gps: state.gps ? gpsSave(state.gps) : null,
     spikes: state.police && state.police.spikes ? spikesSave(state.police.spikes) : null,
     slot: state.saveSlots ? state.saveSlots.active : 1,
+    // v5: the districts' clock (lighthouse beam, sailboats) and the
+    // save format version, so a v4 save is never mistaken for a v5 one.
+    districts: state.districts ? districtsSave(state.districts) : null,
+    version: 5,
     savedAt: Date.now(),
   };
 }

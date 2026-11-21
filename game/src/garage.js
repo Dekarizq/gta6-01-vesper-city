@@ -34,12 +34,20 @@ export const GARAGE_UPGRADES = [
     costs: [500, 1100, 2000],
     topBonus: [2, 5, 8], accelBonus: [4, 9, 14],
   },
+  // v5: CHROME — a gold-trim paint job for the show car in the yard.
+  // Cosmetic only (it changes no driving stat), but the yard shows
+  // it: a chrome car gets a gold roof box on the show car.
+  {
+    id: 'chrome', name: 'CHROME', blurb: 'Gold-trim paint — the show car shines like the sunset',
+    costs: [600, 1200, 2200],
+    chromeBonus: [1, 2, 3],
+  },
 ];
 
 export function createGarage() {
   return {
     owned: ['sedan'],
-    upgrades: { engine: 0, armour: 0, tires: 0, nitro: 0 },
+    upgrades: { engine: 0, armour: 0, tires: 0, nitro: 0, chrome: 0 },
     car: 'sedan',
     lastBought: null,
   };
@@ -77,7 +85,7 @@ export function buyUpgrade(garage, cash, id, crewDiscount = 0) {
 // and its launch bonus is strongest from a standstill (the vehicle code
 // applies it when speed is near zero).
 export function applyUpgrades(carType, upgrades) {
-  const u = upgrades || { engine: 0, armour: 0, tires: 0, nitro: 0 };
+  const u = upgrades || { engine: 0, armour: 0, tires: 0, nitro: 0, chrome: 0 };
   const eng = GARAGE_UPGRADES[0];
   const arm = GARAGE_UPGRADES[1];
   const tir = GARAGE_UPGRADES[2];
@@ -94,6 +102,7 @@ export function applyUpgrades(carType, upgrades) {
     armourBonus: a > 0 ? arm.armourBonus[a - 1] : 0,
     nitro: n,
     nitroLaunch: n > 0 ? nit.accelBonus[n - 1] : 0,
+    chrome: clamp(u.chrome || 0, 0, 3),
   };
 }
 
@@ -110,7 +119,7 @@ export function garageLoad(data) {
   if (!data) return g;
   if (Array.isArray(data.owned) && data.owned.length > 0) g.owned = [...data.owned];
   if (data.upgrades) {
-    for (const id of ['engine', 'armour', 'tires', 'nitro']) {
+    for (const id of ['engine', 'armour', 'tires', 'nitro', 'chrome']) {
       const v = data.upgrades[id];
       if (Number.isInteger(v)) g.upgrades[id] = clamp(v, 0, 3);
     }
@@ -135,6 +144,10 @@ export function garageBoxes(landmark, time, upgrades) {
   if (upgrades && (upgrades.nitro || 0) > 0) {
     const flick = 0.7 + Math.sin(time * 18) * 0.3;
     boxes.push({ x: landmark.x + 7, y: 1.4, z: landmark.z + 5.2, w: 0.9, h: 0.9, d: 0.9, color: [1, 0.5 * flick, 0.1], yaw: 0 });
+  }
+  // v5: a chrome car shows a gold roof box on the show car.
+  if (upgrades && (upgrades.chrome || 0) > 0) {
+    boxes.push({ x: landmark.x, y: 3.4, z: landmark.z, w: 1.8, h: 0.25, d: 2.4, color: [0.95, 0.8, 0.35], yaw: 0.4 });
   }
   return boxes;
 }

@@ -15,6 +15,7 @@ import { CAR_TYPES } from './config.js';
 import { clamp, dist2, angleLerp, wrapAngle } from './random.js';
 import { nearestRoadCoord, roadLines, citySize } from './city.js';
 import { tyrePenalty } from './spikestrip.js';
+import { carPaint } from './textures.js';
 
 export function makeCar(type, x, z, angle, opts = {}) {
   return {
@@ -176,6 +177,10 @@ export function nearestCar(cars, x, z, maxDist) {
 // taillights, a long sunset shadow stretched east, and the Coast
 // Cruiser convertible shows an open top (no cabin box) with two seats.
 // A flat tyre leans the car to the burst side and puffs grey smoke.
+// v5: every type has a real length (the limo is long, the bus is very
+// long, the hatch is short), metallic paint from textures.js, and
+// type-specific trim — a spoiler on the sports car, a roof rack on
+// the pickup, a gold stripe on the limo, big windows on the bus.
 export function carBoxes(car, time = 0) {
   if (car.wreck) {
     return [
@@ -185,14 +190,20 @@ export function carBoxes(car, time = 0) {
       { x: car.x + 0.8, y: 3.6, z: car.z + 0.5, w: 2.0, h: 1.8, d: 2.0, color: [0.35, 0.35, 0.38], yaw: 0 },
     ];
   }
-  const c = car.police ? [0.93, 0.93, 0.96] : car.color;
+  const len = (car.type && car.type.len) || 4.4;
+  const half = len / 2;
+  const paint = carPaint(car.type ? car.type.id : 'sedan');
+  const c = car.police ? [0.93, 0.93, 0.96] : (car.color || paint.body);
   const fx = Math.sin(car.angle), fz = Math.cos(car.angle);
   const rx = Math.cos(car.angle), rz = -Math.sin(car.angle);
   const lean = car.flatTyre ? (car.tyreSide || 1) * 0.06 : 0;
   const boxes = [
     // Long sunset shadow, stretched east away from the low sun.
-    { x: car.x + 1.6, y: 0.06, z: car.z + 0.35, w: 2.6, h: 0.08, d: 5.2, color: [0.14, 0.1, 0.08], yaw: car.angle },
-    { x: car.x, y: 0.55, z: car.z, w: 2.0, h: 0.75, d: 4.4, color: c, yaw: car.angle + lean },
+    { x: car.x + 1.6, y: 0.06, z: car.z + 0.35, w: 2.6, h: 0.08, d: len + 0.8, color: [0.14, 0.1, 0.08], yaw: car.angle },
+    { x: car.x, y: 0.55, z: car.z, w: 2.0, h: 0.75, d: len, color: c, yaw: car.angle + lean },
+    // Metallic trim stripe along the side, so the body is not one
+    // flat colour — the paint's trim colour at the belt line.
+    { x: car.x, y: 0.85, z: car.z, w: 2.06, h: 0.16, d: len * 0.8, color: paint.trim, yaw: car.angle },
   ];
   // Convertible: open top with two seats, no cabin box.
   if (car.type && car.type.id === 'convertible') {
@@ -200,23 +211,37 @@ export function carBoxes(car, time = 0) {
     boxes.push({ x: car.x, y: 1.0, z: car.z + 0.5, w: 0.7, h: 0.5, d: 0.7, color: [0.9, 0.85, 0.8], yaw: car.angle });
     boxes.push({ x: car.x, y: 1.05, z: car.z, w: 1.6, h: 0.35, d: 3.6, color: [0.15, 0.12, 0.14], yaw: car.angle });
   } else {
-    boxes.push({ x: car.x, y: 1.15, z: car.z - 0.2, w: 1.7, h: 0.6, d: 2.2, color: [0.08, 0.1, 0.16], yaw: car.angle });
+    boxes.push({ x: car.x, y: 1.15, z: car.z - 0.2, w: 1.7, h: 0.6, d: Math.min(2.4, len * 0.55), color: paint.glass, yaw: car.angle });
+  }
+  // v5 type trim: spoiler on the sports car, roof rack on the pickup,
+  // gold stripe on the limo, big side windows on the bus.
+  if (car.type && car.type.id === 'sports') {
+    boxes.push({ x: car.x - fx * (half + 0.1), y: 1.25, z: car.z - fz * (half + 0.1), w: 1.9, h: 0.16, d: 0.5, color: [0.08, 0.08, 0.1], yaw: car.angle });
+  }
+  if (car.type && car.type.id === 'pickup') {
+    boxes.push({ x: car.x, y: 1.35, z: car.z - 0.6, w: 1.7, h: 0.18, d: 1.8, color: [0.2, 0.2, 0.22], yaw: car.angle });
+  }
+  if (car.type && car.type.id === 'limo') {
+    boxes.push({ x: car.x, y: 0.95, z: car.z, w: 2.06, h: 0.14, d: len * 0.9, color: [0.85, 0.7, 0.3], yaw: car.angle });
+  }
+  if (car.type && car.type.id === 'bus') {
+    boxes.push({ x: car.x, y: 1.25, z: car.z, w: 1.9, h: 0.7, d: len * 0.7, color: paint.glass, yaw: car.angle });
   }
   // Four wheels with bright rims, two headlights, two taillights.
-  for (const [wx, wz] of [[-0.95, 1.5], [0.95, 1.5], [-0.95, -1.5], [0.95, -1.5]]) {
+  for (const [wx, wz] of [[-0.95, half - 0.7], [0.95, half - 0.7], [-0.95, -(half - 0.7)], [0.95, -(half - 0.7)]]) {
     boxes.push({
       x: car.x + rx * wx + fx * wz, y: 0.32, z: car.z + rz * wx + fz * wz,
       w: 0.28, h: 0.64, d: 0.64, color: [0.08, 0.08, 0.1], yaw: car.angle,
     });
     boxes.push({
       x: car.x + rx * wx * 1.12 + fx * wz, y: 0.32, z: car.z + rz * wx * 1.12 + fz * wz,
-      w: 0.1, h: 0.4, d: 0.4, color: [0.85, 0.85, 0.9], yaw: car.angle,
+      w: 0.1, h: 0.4, d: 0.4, color: paint.rim, yaw: car.angle,
     });
   }
-  boxes.push({ x: car.x - rx * 0.6 + fx * 2.25, y: 0.6, z: car.z - rz * 0.6 + fz * 2.25, w: 0.5, h: 0.3, d: 0.15, color: [1, 0.95, 0.7], yaw: car.angle });
-  boxes.push({ x: car.x + rx * 0.6 + fx * 2.25, y: 0.6, z: car.z + rz * 0.6 + fz * 2.25, w: 0.5, h: 0.3, d: 0.15, color: [1, 0.95, 0.7], yaw: car.angle });
-  boxes.push({ x: car.x - rx * 0.6 - fx * 2.25, y: 0.65, z: car.z - rz * 0.6 - fz * 2.25, w: 0.5, h: 0.28, d: 0.15, color: [0.9, 0.1, 0.15], yaw: car.angle });
-  boxes.push({ x: car.x + rx * 0.6 - fx * 2.25, y: 0.65, z: car.z + rz * 0.6 - fz * 2.25, w: 0.5, h: 0.28, d: 0.15, color: [0.9, 0.1, 0.15], yaw: car.angle });
+  boxes.push({ x: car.x - rx * 0.6 + fx * (half + 0.05), y: 0.6, z: car.z - rz * 0.6 + fz * (half + 0.05), w: 0.5, h: 0.3, d: 0.15, color: [1, 0.95, 0.7], yaw: car.angle });
+  boxes.push({ x: car.x + rx * 0.6 + fx * (half + 0.05), y: 0.6, z: car.z + rz * 0.6 + fz * (half + 0.05), w: 0.5, h: 0.3, d: 0.15, color: [1, 0.95, 0.7], yaw: car.angle });
+  boxes.push({ x: car.x - rx * 0.6 - fx * (half + 0.05), y: 0.65, z: car.z - rz * 0.6 - fz * (half + 0.05), w: 0.5, h: 0.28, d: 0.15, color: [0.9, 0.1, 0.15], yaw: car.angle });
+  boxes.push({ x: car.x + rx * 0.6 - fx * (half + 0.05), y: 0.65, z: car.z + rz * 0.6 - fz * (half + 0.05), w: 0.5, h: 0.28, d: 0.15, color: [0.9, 0.1, 0.15], yaw: car.angle });
   // Nitro flame when the launch boost is firing.
   if ((car.nitroBoost || 0) > 0.3) {
     boxes.push({ x: car.x - fx * 2.6, y: 0.7, z: car.z - fz * 2.6, w: 0.8, h: 0.8, d: 0.8, color: [1, 0.55, 0.1], yaw: 0 });

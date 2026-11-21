@@ -1,5 +1,5 @@
-// main.js — boot and the one loop for Vesper City: Golden Hour — Sunset Kings v4.
-// ?shot=start|chase|street|mission|coast|wheel stages a deterministic frozen
+// main.js — boot and the one loop for Vesper City: Golden Hour — Sunset Kings v5.
+// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown stages a deterministic frozen
 // scene and sets window.__shotReady once it has settled, for screenshots.
 // Otherwise the game runs from the title screen: start, drive, steal, run
 // missions, tune the car at the Sunset Garage, switch radio stations, build
@@ -7,10 +7,13 @@
 // all procedural, no network requests. v4: hold Q for the weapon wheel
 // (tap Q still starts a mission), J for side jobs, L for the GPS route,
 // K to cycle save slots, and the coast — pier, boardwalk, boats — is open.
+// v5: the city is visually rebuilt — lit window facades, street lamps,
+// trees, billboards, the Marina District and Old Town, denser traffic
+// with five new car models, clouds, birds and sea glints.
 import { STEP, SAVE_KEY, GAME_TITLE, WHEEL_HOLD_MS } from './config.js';
 import { createRandom } from './random.js';
 import { createGame, SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSED, SCREEN_DEAD } from './world.js';
-import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM, ACT_WEAPON1, ACT_WEAPON2, ACT_WEAPON3, ACT_WEAPON4, ACT_GARAGE, ACT_RADIO, ACT_JOB, ACT_GPS, ACT_SLOT } from './input.js';
+import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM, ACT_WEAPON1, ACT_WEAPON2, ACT_WEAPON3, ACT_WEAPON4, ACT_GARAGE, ACT_RADIO, ACT_JOB, ACT_GPS, ACT_SLOT, ACT_HUD } from './input.js';
 import { createEngine, chaseCamera, collideCamera } from './engine.js';
 import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
@@ -47,7 +50,7 @@ function startNew() {
   screen = SCREEN_PLAY;
   hud.hideTitle(); hud.hidePause(); hud.hideDead();
   audio.unlock();
-  hud.message('Welcome to Vesper City, Sunset King. Tap Q to start your first mission, hold Q for the weapon wheel, J for side jobs — and find the Sunset Garage when you have cash.', 7);
+  hud.message('Welcome to Vesper City, Sunset King. Tap Q to start your first mission, hold Q for the weapon wheel, J for side jobs — and drive the new Marina District and Old Town when you have cash.', 7);
   announce('Playing Vesper City: Golden Hour — Sunset Kings v4.');
 }
 
@@ -121,6 +124,7 @@ function handleActions() {
   if (a & ACT_SLOT) api.cycleSaveSlot();
   if (a & ACT_RESTART) api.restartMission();
   if (a & ACT_MAP) { game.mapOpen = !game.mapOpen; hud.toggleMap(game.mapOpen); }
+  if (a & ACT_HUD) { const off = hud.toggleHud(); hud.message(off ? 'HUD hidden — press H to bring it back.' : 'HUD back on.', 2); }
   if (a & ACT_MUTE) { const m = audio.toggleMute(); hud.message(m ? 'Sound muted.' : 'Sound on.', 2); }
 }
 

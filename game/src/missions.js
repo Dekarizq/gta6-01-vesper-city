@@ -60,11 +60,19 @@ export function buildMissions(city, coast) {
       steps: [cross(4, 5, 'Reach the spire corner in the eye of the storm', 'goto'),
               cross(5, 9, 'Escape to the harbor with the fund', 'escape')] },
   ];
+  // v5: every mission names the district it plays in — the HUD and
+  // the GPS can say where the story is, not just where to drive.
+  const districts = ['Sunset Mile', 'Harbor Docks', 'Glass Quarter', 'Harbor Docks', 'Harbor Docks', 'Glass Quarter', 'Sunset Mile', 'Sunset Shore', 'Harbor Docks', 'Glass Quarter'];
+  base.forEach((m, i) => { m.district = districts[i] || 'Vesper City'; });
   // v4: missions 11-12 live on the coast — the Tide Kings move in the
   // day after the coronation, and the story continues onto the pier.
   // When no coast is passed (unit tests), the base 10 still stand.
   if (coast) return base.concat(buildExtraMissions(coast));
   return base;
+}
+
+export function missionDistrict(m) {
+  return (m && m.district) || 'Vesper City';
 }
 
 export function createMissionState(missions) {

@@ -24,7 +24,7 @@ export function buildExtraMissions(coast) {
   const shack = coast.points.surfShack;
   return [
     {
-      id: 11, title: 'Tide Runner', giver: 'Dario Kess', reward: 2000, respect: 220,
+      id: 11, title: 'Tide Runner', giver: 'Dario Kess', reward: 2000, respect: 220, district: 'Sunset Beach',
       intro: 'Dario: "The Tide Kings took my ledger and ran for the pier. They think the coast is theirs. Prove them wrong."',
       steps: [
         cross(5, 9, 'Reach the Harbor Docks — the runner was seen here', 'goto'),
@@ -34,7 +34,7 @@ export function buildExtraMissions(coast) {
       ],
     },
     {
-      id: 12, title: 'King of the Sunset', giver: 'Lena Voss', reward: 4000, respect: 350,
+      id: 12, title: 'King of the Sunset', giver: 'Lena Voss', reward: 4000, respect: 350, district: 'Marina District',
       intro: 'Lena: "One last run, Mara. The whole Tide Kings crew is on the pier at sunset. Take the ledger back — and take the coast."',
       steps: [
         cross(8, 8, 'Meet Lena at the Sunset Garage — gear up', 'pickup'),

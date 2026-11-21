@@ -1,5 +1,5 @@
-// shots.js — deterministic screenshot scenes for Sunset Kings (v4) behind
-// ?shot=start|chase|street|mission|coast|wheel. Each stages the real game
+// shots.js — deterministic screenshot scenes for Sunset Kings (v5) behind
+// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown. Each stages the real game
 // state and then FREEZES it (game.frozen): the main loop draws the staged
 // frame but the world does not advance, so the car, the cops, the
 // helicopter and the burning wreck stay exactly where they were placed.
@@ -10,7 +10,9 @@
 // the coast scene stages the Tide Runner chase on the pier with boats
 // and a spike strip, the wheel scene shows the weapon wheel open with
 // the shotgun picked, and every scene shows the respect rank, the radio
-// station and the garage panel.
+// station and the garage panel. v5 adds the marina hero (Sunset Viper
+// on the quay, yachts and the lighthouse behind) and the old-town
+// night market (Mara on foot among the stalls, church tower behind).
 import { SCREEN_PLAY } from './world.js';
 import { addWanted } from './police.js';
 import { makeCar } from './vehicles.js';
@@ -113,6 +115,40 @@ export function stageShot(name, api) {
     addRespect(game.respect, 900);
     game.radioState.index = 3; // COAST 104.7 — Beach Nights
     game.cash = 31200;
+    return;
+  }
+  if (name === 'marina') {
+    // v5 hero: Mara in the red Sunset Viper sports car on the marina
+    // quay, facing SOUTH toward the sea — white yachts, harbour
+    // cranes and the lighthouse ahead, the fish market to the left,
+    // a sailboat crossing the water. No police, just golden hour.
+    const car = makeCar({ id: 'sports', name: 'Sunset Viper', color: [0.95, 0.25, 0.15], top: 38, accel: 26, brake: 36, grip: 3.3, len: 4.4 }, 200, 250, 0, { driver: false });
+    game.garageState.upgrades.engine = 2;
+    game.garageState.upgrades.nitro = 2;
+    player.inCar = true; player.car = car; player.x = 200; player.z = 250; player.angle = 0; player.speed = 12;
+    car.speed = 12;
+    car.nitroBoost = 0.5;
+    addRespect(game.respect, 900);
+    game.radioState.index = 4; // MARINA 99.9 — Yacht Rock
+    api.startMission();
+    stageGps(api);
+    game.msg = null;
+    game.cash = 41200;
+    return;
+  }
+  if (name === 'oldtown') {
+    // v5 hero: Mara on foot in the Old Town night market, facing
+    // NORTH into the stalls — striped awnings, warm lamps, neon,
+    // the church tower behind the market, clotheslines overhead.
+    // A quiet scene on purpose: the market is the picture.
+    player.inCar = false; player.car = null;
+    player.x = -30; player.z = -182; player.angle = Math.PI;
+    addRespect(game.respect, 700);
+    game.radioState.index = 0;
+    api.startMission();
+    stageGps(api);
+    game.msg = null;
+    game.cash = 18700;
     return;
   }
   if (name === 'wheel') {

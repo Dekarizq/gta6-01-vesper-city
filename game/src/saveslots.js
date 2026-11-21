@@ -90,6 +90,7 @@ export function listSlots() {
       slot: def.slot,
       name: def.name,
       has: true,
+      version: data.version || 4,
       cash: data.cash,
       missionIndex: data.missionIndex || 0,
       missionDone: data.missionDone || 0,

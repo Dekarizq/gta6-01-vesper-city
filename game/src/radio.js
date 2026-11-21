@@ -29,6 +29,13 @@ export const RADIO_STATIONS = [
     tempo: 112, root: 164.81, scale: [0, 2, 3, 7, 9, 12],
     mood: 'beach night groove',
   },
+  // v5: the marina's own station — slow yacht rock for the quay, the
+  // fifth voice of the city, and the one the marina screenshot plays.
+  {
+    id: 'marina', name: 'MARINA 99.9', show: 'Yacht Rock',
+    tempo: 88, root: 185.0, scale: [0, 2, 4, 5, 7, 9, 11, 12],
+    mood: 'smooth marina glide',
+  },
 ];
 
 export function createRadio() {

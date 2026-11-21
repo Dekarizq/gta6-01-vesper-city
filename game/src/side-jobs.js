@@ -43,17 +43,19 @@ function jobSpots(type) {
   if (type === 'taxi') {
     return {
       pickup: roadCross(1, 1),
-      dropoff: roadCross(5, 9),
+      // v5: the fare wants Old Town — the night market, not the docks.
+      dropoff: roadCross(5, 0),
       label: 'Fare waiting on Sunset Mile',
-      dropLabel: 'Drop the fare at the Harbor Docks',
+      dropLabel: 'Drop the fare in Old Town',
     };
   }
   if (type === 'delivery') {
     return {
       pickup: roadCross(5, 9),
-      dropoff: roadCross(9, 1),
+      // v5: the parcel goes to the Marina District fish market.
+      dropoff: roadCross(9, 9),
       label: 'Collect the parcel at the Harbor Docks',
-      dropLabel: 'Deliver it to the Sunset Shore relay',
+      dropLabel: 'Deliver it to the Marina District fish market',
     };
   }
   // Race: three checkpoints down the Shore boulevard (z = +27 line).

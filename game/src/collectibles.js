@@ -61,6 +61,13 @@ const SPOTS = [
   { ix: 8, iz: 9, name: 'Boat Dock turn' },
   { ix: 3, iz: 9, name: 'Lifeguard crossing' },
   { ix: 7, iz: 9, name: 'Sunset Pier approach' },
+  // v5 district coins: three on the marina quay, three in Old Town.
+  { ix: 9, iz: 9, name: 'Marina quay' },
+  { ix: 9, iz: 8, name: 'Lighthouse steps' },
+  { ix: 8, iz: 9, name: 'Fish market corner' },
+  { ix: 1, iz: 0, name: 'Old Town gate' },
+  { ix: 2, iz: 0, name: 'Night market lane' },
+  { ix: 3, iz: 0, name: 'Church square' },
 ];
 
 function dist2(ax, az, bx, bz) {
@@ -89,7 +96,7 @@ export function createCollectibles() {
   }
 
   return {
-    // How many coins are on the map in total (30 in v4: 24 city + 6 coast).
+    // How many coins are on the map in total (36 in v5: 24 city + 6 coast + 6 districts).
     total: coins.length,
     // How many Mara has pocketed today.
     count() { return collectedToday; },

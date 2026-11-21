@@ -15,6 +15,10 @@ export const RESPECT_RANKS = [
   { name: 'SUNSET KING', min: 1500, blurb: 'Vesper City is yours. The storm can come.' },
   // v4: one rank past the crown — the coast is a harder kingdom.
   { name: 'COAST LEGEND', min: 2200, blurb: 'King of the streets AND the sunset coast. Kai rides with you.' },
+  // v5: the last rank — only for a king who owns the marina and the
+  // old town too, not just the beach. No new crew at the top; the
+  // title itself is the reward.
+  { name: 'VESPER LEGEND', min: 3200, blurb: 'Marina, Old Town, beach and streets — all of Vesper City is yours.' },
 ];
 
 export const CREW = [

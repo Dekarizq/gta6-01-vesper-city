@@ -4,7 +4,7 @@
 // v4 adds beachgoers on the coast: sunbathers on towels, walkers on the
 // sand, and surfers paddling out to sea — the coast module owns their
 // look, this module owns the shared walker behaviour they build on.
-import { clamp, dist2 } from './random.js';
+import { clamp, dist2, gauss } from './random.js';
 import { citySize, nearestRoadCoord, resolveBuildingCollision } from './city.js';
 
 const SHIRTS = [
@@ -18,10 +18,15 @@ export function spawnPedestrians(rng, count, cx, cz) {
   for (let i = 0; i < count; i += 1) {
     const x = clamp(cx + rng.range(-80, 80), -size / 2 + 6, size / 2 - 6);
     const z = clamp(cz + rng.range(-80, 80), -size / 2 + 6, size / 2 - 6);
+    // v5: the crowd has kinds — most walk, some run (faster, cap),
+    // some are tourists (hat + camera, slow, they stop and look).
+    const roll = rng.next();
+    const kind = roll < 0.2 ? 'runner' : roll < 0.35 ? 'tourist' : 'walker';
     peds.push({
-      x, z, angle: rng.range(0, Math.PI * 2), speed: rng.range(1.2, 2.4),
+      x, z, angle: rng.range(0, Math.PI * 2),
+      speed: kind === 'runner' ? rng.range(3.2, 4.2) : kind === 'tourist' ? rng.range(0.8, 1.2) : clamp(1.8 + gauss(rng) * 0.45, 1.2, 2.4),
       shirt: SHIRTS[rng.int(0, SHIRTS.length - 1)], flee: 0, dead: false, bob: rng.range(0, 6),
-      crew: null,
+      crew: null, kind,
     });
   }
   return peds;
@@ -64,7 +69,8 @@ export function stepPedestrians(peds, dt, player, cars, gunshot, buildings) {
       p.speed = 5.5;
     } else if (p.flee > 0) {
       p.flee -= dt;
-      if (p.flee <= 0) p.speed = 1.6;
+      // v5: a runner goes back to running, a tourist back to strolling.
+      if (p.flee <= 0) p.speed = p.kind === 'runner' ? 3.6 : p.kind === 'tourist' ? 1.0 : 1.6;
     }
     // Wander: drift along sidewalks, turn at random.
     if (p.flee <= 0 && Math.random() < dt * 0.2) p.angle += (Math.random() - 0.5) * 2.4;
@@ -130,9 +136,18 @@ export function pedBoxes(p) {
     return [{ x: p.x, y: 0.3, z: p.z, w: 0.6, h: 0.5, d: 1.8, color: p.shirt, yaw: p.angle }];
   }
   const bob = Math.sin(p.bob) * 0.06;
-  return [
+  const boxes = [
     { x: p.x, y: 0.45 + bob, z: p.z, w: 0.6, h: 0.9, d: 0.45, color: p.shirt, yaw: p.angle },
     { x: p.x, y: 1.1 + bob, z: p.z, w: 0.45, h: 0.45, d: 0.45, color: [0.85, 0.7, 0.55], yaw: p.angle },
     { x: p.x, y: 0.2, z: p.z, w: 0.5, h: 0.4, d: 0.4, color: [0.12, 0.12, 0.18], yaw: p.angle },
   ];
+  // v5 kinds read at a glance: runners wear a cap and lean forward,
+  // tourists wear a wide sun hat and carry a camera box.
+  if (p.kind === 'runner') {
+    boxes.push({ x: p.x, y: 1.38 + bob, z: p.z, w: 0.5, h: 0.14, d: 0.5, color: [0.9, 0.2, 0.25], yaw: p.angle });
+  } else if (p.kind === 'tourist') {
+    boxes.push({ x: p.x, y: 1.36 + bob, z: p.z, w: 0.7, h: 0.12, d: 0.7, color: [0.95, 0.85, 0.5], yaw: p.angle });
+    boxes.push({ x: p.x + Math.sin(p.angle) * 0.4, y: 0.9 + bob, z: p.z + Math.cos(p.angle) * 0.4, w: 0.3, h: 0.25, d: 0.2, color: [0.15, 0.15, 0.18], yaw: p.angle });
+  }
+  return boxes;
 }

@@ -181,6 +181,13 @@ export function gpsLabel(gps, px, pz, angle) {
   return `GPS ${Math.round(gpsRemaining(gps, px, pz))}m · ${gpsNextTurn(gps, px, pz, angle)}`;
 }
 
+// v5: the same label, with the district Mara is driving through —
+// "GPS 432m · Straight on — Marina District" reads like a real sat-nav.
+export function gpsLabelWithDistrict(gps, px, pz, angle, district) {
+  const base = gpsLabel(gps, px, pz, angle);
+  return district ? `${base} · ${district}` : base;
+}
+
 export function gpsSave(gps) {
   return { enabled: gps.enabled };
 }

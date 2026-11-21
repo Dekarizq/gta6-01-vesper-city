@@ -7,8 +7,13 @@
 // and a stronger sun-side shade so the sunset reads on every face, a
 // bigger sun halo, and long ground shadows under cars and people cast
 // away from the low sun — the cheapest depth cue a box city can buy.
+// v5: the static buffer now also carries the whole visual overhaul —
+// lit window facades, roof furniture, street lamps, trees, billboards
+// and benches from visuals.js — and the sky colour deepens with the
+// game clock instead of staying one fixed gold.
 import { clamp } from './random.js';
 import { SUN } from './config.js';
+import { facadeStaticBoxes } from './visuals.js';
 
 const VERT = `
 attribute vec3 aPos; attribute vec3 aNormal; attribute vec3 aColor;
@@ -204,6 +209,13 @@ export function createEngine(canvas, city) {
     pushBox(s, um.x, 1.1, um.z, 0.18, 2.2, 0.18, [0.6, 0.5, 0.4], 0);
     pushBox(s, um.x, 2.4, um.z, 3.4, 0.3, 3.4, col, 0);
   }
+  // v5 visual overhaul: every facade's lit window grid, roof
+  // furniture, street lamps, street trees, billboards and benches are
+  // baked into this same static buffer — one draw call, no per-frame
+  // cost, and the city finally looks lived-in instead of flat.
+  for (const b of facadeStaticBoxes(city)) {
+    pushBox(s, b.x, b.y, b.z, b.w, b.h, b.d, b.color, b.yaw || 0);
+  }
   // Harbor bridge deck crossing the water.
   pushBox(s, 0, 2.2, size / 2 + 55, 14, 0.8, 120, [0.3, 0.24, 0.18], 0);
   pushBox(s, -8, 6, size / 2 + 55, 0.8, 8, 100, [0.7, 0.3, 0.35], 0);
@@ -247,6 +259,10 @@ export function createEngine(canvas, city) {
   return {
     /** Draw one frame. cam = {eye:[x,y,z], target:[x,y,z]}; boxes = dynamic boxes. */
     draw(cam, boxes, time) {
+      // v5: the sky deepens as the hurricane countdown advances —
+      // the clear colour follows the same sky curve as the sun.
+      const sky = skyColor(time || 0);
+      gl.clearColor(sky[0], sky[1], sky[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       const aspect = canvas.width / Math.max(1, canvas.height);
       const proj = mat4Perspective(1.05, aspect, 0.5, 900);

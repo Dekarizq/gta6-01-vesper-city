@@ -82,6 +82,12 @@ export function createCoast(city) {
   return {
     city, size, beachZ, seaZ, points, boats, beachgoers,
     tide: 0, time: 0,
+    // v5: two sailboats that actually sail across the sea, east to
+    // west, on a slow loop — the only moving traffic on the water.
+    sailboats: [
+      { x: -160, z: seaZ + 34, speed: 3.0, phase: 0, hull: [0.9, 0.9, 0.92] },
+      { x: 40, z: seaZ + 52, speed: 2.4, phase: 30, hull: [0.95, 0.75, 0.3] },
+    ],
     // Surfboards leaning on the lifeguard tower and the shack.
     surfboards: [
       { x: 12, z: beachZ + 6, color: [1, 0.45, 0.3], lean: 0.3 },
@@ -104,6 +110,11 @@ export function tideLevel(coast, time) {
 export function stepCoast(coast, dt, player) {
   coast.time += dt;
   tideLevel(coast, coast.time);
+  // v5: the sailboats cross the sea, east to west, and wrap around.
+  for (const s of coast.sailboats || []) {
+    s.x += s.speed * dt;
+    if (s.x > 260) s.x = -260;
+  }
   // Surfers paddle out to sea and drift back, on a 40-second loop.
   for (const s of coast.beachgoers) {
     if (s.kind !== 'surf') continue;
@@ -219,6 +230,13 @@ export function coastBoxes(coast, time) {
     x: -40 + tide * 6, y: 0.15, z: coast.seaZ + 6, w: 46, h: 0.08, d: 60,
     color: [1, 0.72, 0.32], yaw: 0,
   });
+  // v5: the sailing boats, hull + mast + sail, bobbing as they cross.
+  for (const sb of coast.sailboats || []) {
+    const bob = Math.sin(time * 1.3 + sb.phase) * 0.3;
+    out.push({ x: sb.x, y: 0.6 + bob, z: sb.z, w: 3.4, h: 1.2, d: 8, color: sb.hull, yaw: 0.1 });
+    out.push({ x: sb.x, y: 4.4 + bob, z: sb.z - 0.5, w: 0.25, h: 6.5, d: 0.25, color: [0.4, 0.3, 0.2], yaw: 0 });
+    out.push({ x: sb.x, y: 4.8 + bob, z: sb.z - 0.5, w: 3.8, h: 4.6, d: 0.2, color: [0.98, 0.94, 0.86], yaw: 0.1 });
+  }
   // Surfboards leaning by the tower and the shack.
   for (const sb of coast.surfboards) {
     out.push({ x: sb.x, y: 1.6, z: sb.z, w: 0.7, h: 3.4, d: 0.18, color: sb.color, yaw: sb.lean });

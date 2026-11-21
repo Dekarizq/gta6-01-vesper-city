@@ -128,6 +128,11 @@ export function stripBoxes(strips, time, now) {
       x: s.x, y: 2.0 + Math.sin(time * 3) * 0.25, z: s.z,
       w: 1.1, h: 1.1, d: 1.1, color: [1, 0.75, 0.1], yaw: time,
     });
+    // v5: red end lights, blinking in turn, so the strip reads as a
+    // police trap from down the road instead of a dark bar.
+    const alt = Math.sin(time * 6) > 0;
+    out.push({ x: s.x + Math.cos(s.angle) * 2.6, y: 0.5, z: s.z - Math.sin(s.angle) * 2.6, w: 0.4, h: 0.5, d: 0.4, color: alt ? [1, 0.1, 0.15] : [0.4, 0.05, 0.08], yaw: 0 });
+    out.push({ x: s.x - Math.cos(s.angle) * 2.6, y: 0.5, z: s.z + Math.sin(s.angle) * 2.6, w: 0.4, h: 0.5, d: 0.4, color: alt ? [0.4, 0.05, 0.08] : [1, 0.1, 0.15], yaw: 0 });
   }
   return out;
 }

@@ -55,6 +55,14 @@ export function createAudio() {
       g2.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.2, dur));
       o2.connect(g2); g2.connect(radioGain); o2.start(t); o2.stop(t + Math.max(0.25, dur) + 0.05);
     }
+    if (radioStation === 'marina') {
+      const o4 = ctx.createOscillator(); o4.type = 'sine'; o4.frequency.value = freq * 1.25;
+      const g4 = ctx.createGain();
+      g4.setValueAtTime(0.0001, t);
+      g4.gain.exponentialRampToValueAtTime(0.04, t + 0.03);
+      g4.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.2, dur));
+      o4.connect(g4); g4.connect(radioGain); o4.start(t); o4.stop(t + Math.max(0.25, dur) + 0.05);
+    }
     if (radioStation === 'coast') {
       const o3 = ctx.createOscillator(); o3.type = 'sine'; o3.frequency.value = freq * 1.5;
       const g3 = ctx.createGain();
@@ -133,6 +141,9 @@ export function createAudio() {
       });
     },
     // v4: wheel tick, race countdown beep, taxi horn, spike hiss.
+    // v5: a seagull cry over the marina and the coast — two falling
+    // notes, quiet, so it never fights the radio.
+    gull() { blip(1900, 0.28, 0.05, 'sine'); setTimeout(() => blip(1500, 0.32, 0.04, 'sine'), 160); },
     wheelTick() { blip(1200, 0.07, 0.12, 'square'); },
     raceBeep(final) { blip(final ? 1320 : 880, final ? 0.35 : 0.15, 0.2, 'sine'); },
     horn() { blip(420, 0.25, 0.18, 'sawtooth'); blip(530, 0.25, 0.14, 'sawtooth'); },
