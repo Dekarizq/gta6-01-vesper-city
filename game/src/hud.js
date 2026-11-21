@@ -1,13 +1,15 @@
-// hud.js — the DOM HUD for Sunset Kings (v3), dense like the rank 1-2
-// entries: big cash, health + armour bars, wanted stars, three weapon
+// hud.js — the DOM HUD for Sunset Kings (v4), dense like the rank 1-2
+// entries: big cash, health + armour bars, wanted stars, four weapon
 // slots with ammo, storm countdown, district + radio, a mission card
 // with progress, a live VCPD pursuit panel with named officers and
 // tactics, a dialog box with a portrait, a big speedometer with car
 // name/condition, a circular minimap — and new in v3: a respect bar
 // with Mara's rank, the crew who have joined, and the Sunset Garage
-// shop panel with upgrade levels and prices. The gameplay panels hide
-// on the title screen. Also the start screen, pause menu, map overlay
-// and drizzle overlay canvas.
+// shop panel with upgrade levels and prices. v4 adds the weapon wheel
+// overlay (hold Q), a side-job card with its timer, a GPS chip with the
+// next turn, a coast chip, a spike-strip warning, and the save-slot line.
+// The gameplay panels hide on the title screen. Also the start screen,
+// pause menu, map overlay and drizzle overlay canvas.
 import { WANTED_MAX } from './config.js';
 import { districtAt } from './city.js';
 import { respectRank, nextRank } from './respect.js';
@@ -27,11 +29,16 @@ export function createHud(city) {
     <div id="hud-mission" class="hud-panel"></div>
     <div id="hud-vcpd" class="hud-panel"></div>
     <div id="hud-garage" class="hud-panel"></div>
+    <div id="hud-jobs" class="hud-panel"></div>
+    <div id="hud-gps" class="hud-panel"></div>
+    <div id="hud-coast" class="hud-panel"></div>
+    <div id="hud-slots" class="hud-panel"></div>
+    <div id="weapon-wheel" class="hud-panel"></div>
     <div id="hud-dialog" class="hud-panel"><div id="hud-portrait">D</div><div id="hud-dialog-text"></div></div>
     <div id="hud-objective" class="hud-panel"></div>
     <div id="hud-speedo" class="hud-panel"><div id="hud-speed">0</div><div id="hud-speed-unit">KM/H</div><div id="hud-speed-car"></div></div>
     <div id="hud-msg" class="hud-panel"></div>
-    <div id="hud-help" class="hud-panel">WASD drive / walk &nbsp;·&nbsp; E steal car &nbsp;·&nbsp; F / click shoot &nbsp;·&nbsp; 1/2/3 weapons &nbsp;·&nbsp; G garage &nbsp;·&nbsp; R radio &nbsp;·&nbsp; Space handbrake &nbsp;·&nbsp; Shift sprint &nbsp;·&nbsp; Q mission &nbsp;·&nbsp; T restart &nbsp;·&nbsp; M map &nbsp;·&nbsp; P pause</div>
+    <div id="hud-help" class="hud-panel">WASD drive / walk &nbsp;·&nbsp; E steal car &nbsp;·&nbsp; F / click shoot &nbsp;·&nbsp; 1/2/3/4 weapons &nbsp;·&nbsp; HOLD Q wheel / TAP Q mission &nbsp;·&nbsp; G garage &nbsp;·&nbsp; R radio &nbsp;·&nbsp; J side job &nbsp;·&nbsp; L GPS &nbsp;·&nbsp; K save slot &nbsp;·&nbsp; Space handbrake &nbsp;·&nbsp; Shift sprint &nbsp;·&nbsp; T restart &nbsp;·&nbsp; M map &nbsp;·&nbsp; P pause</div>
     <canvas id="minimap" class="hud-panel" width="190" height="190"></canvas>
     <div id="map-overlay"><div id="map-title">VESPER CITY — SUNSET KINGS · 7 DAYS TO THE STORM</div><canvas id="bigmap" width="640" height="640"></canvas><div id="map-hint">Press M to close</div></div>
     <div id="title-screen">
@@ -39,13 +46,14 @@ export function createHud(city) {
         <div id="title-kicker">A SUN-SOAKED OPEN WORLD · GOLDEN HOUR BEFORE THE HURRICANE · SUNSET KINGS</div>
         <h1 id="title-name">VESPER CITY<br><span>GOLDEN HOUR</span><br><span class="title-kings">— SUNSET KINGS —</span></h1>
         <p id="title-story">Mara Voss, getaway driver. One week before Hurricane Ilsa drowns the city, the morning rain
-        has cleared and the whole coast is gold. Fixer Dario Kess offers her one last way out — ten jobs, ten sunsets, no way back.
-        Build respect, gather your crew, tune your car at the Sunset Garage, and become the Sunset King.</p>
+        has cleared and the whole coast is gold. Fixer Dario Kess offers her one last way out — twelve jobs, twelve sunsets, no way back.
+        Build respect, gather your crew, tune your car at the Sunset Garage, hold the beach against the Tide Kings, and become the Sunset King.</p>
         <div id="title-controls">WASD / Arrows — drive &amp; walk &nbsp;·&nbsp; E — steal car &nbsp;·&nbsp; F / click — shoot<br>
-        1 / 2 / 3 — switch weapon &nbsp;·&nbsp; G — Sunset Garage &nbsp;·&nbsp; R — radio station &nbsp;·&nbsp; Space — handbrake &nbsp;·&nbsp; Shift — sprint &nbsp;·&nbsp; Q — start mission &nbsp;·&nbsp; T — restart mission &nbsp;·&nbsp; M — map &nbsp;·&nbsp; P — pause</div>
+        1 / 2 / 3 / 4 — switch weapon &nbsp;·&nbsp; HOLD Q — weapon wheel &nbsp;·&nbsp; TAP Q — start mission &nbsp;·&nbsp; G — Sunset Garage &nbsp;·&nbsp; R — radio station<br>
+        J — side job (taxi / delivery / race) &nbsp;·&nbsp; L — GPS route &nbsp;·&nbsp; K — save slot &nbsp;·&nbsp; Space — handbrake &nbsp;·&nbsp; Shift — sprint &nbsp;·&nbsp; T — restart mission &nbsp;·&nbsp; M — map &nbsp;·&nbsp; P — pause</div>
         <button id="start-btn">START ENGINE</button>
         <button id="continue-btn">CONTINUE SAVED GAME</button>
-        <div id="title-foot">10 story missions · 5 car types · Sunset Garage upgrades · 3 radio stations · respect ranks &amp; crew · wanted 0–5 · named VCPD units, roadblocks &amp; CONDOR-1 helicopter · cars that burn &amp; explode · save in your browser</div>
+        <div id="title-foot">12 story missions · 6 car types · Sunset Garage upgrades incl. NITRO · 4 radio stations · respect ranks &amp; crew · wanted 0–6 · spike strips · named VCPD units, roadblocks &amp; CONDOR-1 helicopter · cars that burn &amp; explode · Sunset Beach coast with pier, boats &amp; side jobs · GPS route · 3 save slots</div>
       </div>
     </div>
     <div id="pause-screen"><h2>PAUSED</h2><p>WASD drive · E steal car · F shoot · 1/2/3 weapons · G garage · R radio · Q mission · T restart mission · U mute</p>
@@ -83,7 +91,26 @@ export function createHud(city) {
     }
     for (const l of city.landmarks) {
       const [lx, lz] = toMap(l.x, l.z);
-      ctx.fillStyle = l.id === 'garage' ? '#ffd166' : '#ffd166'; ctx.beginPath(); ctx.arc(lx, lz, l.id === 'garage' ? 5 : 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = l.id === 'garage' ? '#ffd166' : l.id === 'pier' || l.id === 'boatdock' ? '#7dd3fc' : '#ffd166';
+      ctx.beginPath(); ctx.arc(lx, lz, l.id === 'garage' ? 5 : 3, 0, Math.PI * 2); ctx.fill();
+    }
+    // v4: the GPS route as a gold polyline, the coast band as a blue
+    // strip along the south edge, and live spike strips as red dots.
+    if (state.gps && state.gps.route && state.gps.route.length > 1) {
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = Math.max(2, size / 160);
+      ctx.beginPath();
+      state.gps.route.forEach((p, i) => {
+        const [rx, rz] = toMap(p.x, p.z);
+        if (i === 0) ctx.moveTo(rx, rz); else ctx.lineTo(rx, rz);
+      });
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(125,211,252,0.35)';
+    ctx.fillRect(0, size * 0.965, size, size * 0.035);
+    if (state.spikeAhead) {
+      ctx.fillStyle = '#ef4444';
+      ctx.font = `bold ${Math.max(9, size / 22)}px sans-serif`;
+      ctx.fillText('▲ SPIKE ' + state.spikeAhead + 'm', size * 0.04, size * 0.08);
     }
     const step = state.missionStep;
     if (step) {
@@ -194,7 +221,8 @@ export function createHud(city) {
       if (cops.length > 0) {
         $('hud-vcpd').innerHTML = `<div class="vcpd-head">● VCPD RESPONSE &nbsp; ${cops.length} UNIT${cops.length === 1 ? '' : 'S'}${state.heliUp ? ' · CONDOR-1 AIR SUPPORT' : ''}</div>`
           + cops.map((c) => `<div class="vcpd-row"><span>${c.callsign} ${c.officer || ''}</span><span class="vcpd-status">${c.tactic || c.status}</span><span>${c.dist}m</span></div>`).join('')
-          + (state.roadblock ? '<div class="vcpd-warn">▲ ROADBLOCK AHEAD — find another way round</div>' : '');
+          + (state.roadblock ? '<div class="vcpd-warn">▲ ROADBLOCK AHEAD — find another way round</div>' : '')
+          + (state.spikeAhead ? `<div class="vcpd-warn">▲ SPIKE STRIP ${state.spikeAhead}m AHEAD — slow down or swerve!</div>` : '');
         $('hud-vcpd').style.display = 'block';
       } else {
         $('hud-vcpd').innerHTML = '<div class="vcpd-head">● VCPD RESPONSE &nbsp; 0 UNITS</div><div class="vcpd-row">No units on you — the coast is clear.</div>';
@@ -211,6 +239,54 @@ export function createHud(city) {
           + (state.wrecks ? `<div class="vcpd-row"><span>Wrecks left burning</span><span>${state.wrecks}</span></div>` : '');
         $('hud-garage').style.display = 'block';
       }
+      // v4: weapon wheel overlay — four slots in a ring, the hovered
+      // slot gold, the active slot outlined. Hidden when closed.
+      if (state.wheel && state.wheel.open) {
+        const slots = state.wheel.slots || [];
+        $('weapon-wheel').innerHTML = '<div class="wheel-title">WEAPON WHEEL — release Q to pick</div>'
+          + slots.map((s, i) => {
+            const pos = [[50, 8], [86, 50], [50, 86], [14, 50]][i % 4];
+            return `<div class="wheel-slot ${s.hovered ? 'hovered' : ''} ${s.active ? 'active' : ''}" style="left:${pos[0]}%;top:${pos[1]}%">${s.name}<br><span>${s.ammo === Infinity ? '∞' : s.ammo}</span></div>`;
+          }).join('');
+        $('weapon-wheel').style.display = 'block';
+      } else {
+        $('weapon-wheel').style.display = 'none';
+      }
+      // v4: side-job card with its timer and payout, or the job totals
+      // when free — the city always has work, even after the story ends.
+      if (state.job) {
+        $('hud-jobs').innerHTML = `<div class="vcpd-head">💼 SIDE JOB — ${state.job.name}</div>`
+          + `<div class="vcpd-row"><span>${state.job.text}</span><span>${state.job.timeLeft}s</span></div>`
+          + `<div class="vcpd-row"><span>Pay on completion</span><span>$${state.job.pay}</span></div>`
+          + (state.job.checkpoint ? `<div class="vcpd-row"><span>Checkpoints</span><span>${state.job.checkpoint}</span></div>` : '');
+        $('hud-jobs').style.display = 'block';
+      } else if (state.jobsSummary && state.jobsSummary.total > 0) {
+        $('hud-jobs').innerHTML = `<div class="vcpd-head">💼 SIDE JOBS — press J for the next</div>`
+          + `<div class="vcpd-row"><span>Jobs done</span><span>${state.jobsSummary.total} · $${state.jobsSummary.earned} earned</span></div>`
+          + `<div class="vcpd-row"><span>Best race</span><span>${state.jobsSummary.bestRace ? Math.round(state.jobsSummary.bestRace) + 's' : '—'}</span></div>`;
+        $('hud-jobs').style.display = 'block';
+      } else {
+        $('hud-jobs').innerHTML = '<div class="vcpd-head">💼 SIDE JOBS — press J for work</div><div class="vcpd-row">Taxi · Delivery · Street Race — repeatable, paid in cash + respect</div>';
+        $('hud-jobs').style.display = 'block';
+      }
+      // v4: GPS chip — the next turn and the distance to the target.
+      if (state.gps) {
+        $('hud-gps').textContent = '🧭 ' + (state.gps.label || '');
+        $('hud-gps').style.display = 'block';
+      }
+      // v4: coast chip — which part of the beach Mara is standing on.
+      if (state.coast) {
+        $('hud-coast').textContent = '🏖 ' + state.coast + ' · Sunset Beach';
+        $('hud-coast').style.display = 'block';
+      } else {
+        $('hud-coast').style.display = 'none';
+      }
+      // v4: save-slot line — which slot is active, and what it holds.
+      if (state.slots) {
+        const filled = state.slots.filter((s) => s.has).length;
+        $('hud-slots').textContent = `💾 ${state.slotLabel || 'SLOT 1'} · ${filled}/3 slots filled · K cycles slots`;
+        $('hud-slots').style.display = 'block';
+      }
       if (state.missionGiver && m) {
         $('hud-dialog-text').innerHTML = `<b>${state.missionGiver}</b> — ${m.text}`;
         $('hud-portrait').textContent = state.missionGiver[0];
@@ -222,7 +298,11 @@ export function createHud(city) {
         ? `<b>${m.title}</b> — ${m.text}<span class="obj-dist">${Math.round(m.dist)}m</span>`
         : 'Free roam — press Q to start the next story mission';
       $('hud-speed').textContent = state.speedKmh || 0;
-      $('hud-speed-car').textContent = state.carName ? `${state.carName} · CONDITION ${state.carCondition ?? 100}%` : 'ON FOOT';
+      // v4: a flat tyre and a firing nitro both show on the speedo, so
+      // the player always knows why the car feels wrong — or very right.
+      $('hud-speed-car').textContent = state.carName
+        ? `${state.carName} · CONDITION ${state.carCondition ?? 100}%${state.flatTyre ? ' · ⚠ FLAT TYRE — garage repairs free' : ''}${state.nitro > 0.3 ? ' · 🔥 NITRO!' : ''}`
+        : 'ON FOOT';
       drawMap(mm, 190, state.x, state.z, state);
       if (this.isMapOpen()) drawMap(bm, 640, state.x, state.z, state);
       const w = rain.width = window.innerWidth, h = rain.height = window.innerHeight;

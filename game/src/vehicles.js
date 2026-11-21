@@ -1,15 +1,20 @@
-// vehicles.js — cars for Sunset Kings (v3): the player's car, traffic AI,
+// vehicles.js — cars for Sunset Kings (v4): the player's car, traffic AI,
 // stealing, and the new damage model. Every car has health: shoot it,
 // ram it, or slam it into a tower and it starts to burn; keep hurting it
 // and it explodes, leaving a smoking wreck that stays on the road. Police
 // cruisers are white with a red/blue light bar so they read clearly
 // against warm golden-hour roads, and each carries a named VCPD unit.
 // Garage upgrades change the player's car for real: engine raises top
-// speed and pull, tyres raise grip — stepPlayerCar takes the effective
-// stats the garage computed, never the base type alone.
+// speed and pull, tyres raise grip, NITRO fires a launch boost from a
+// standstill — stepPlayerCar takes the effective stats the garage
+// computed, never the base type alone. v4 also adds flat tyres from
+// spike strips (top speed and grip collapse until Rook patches them),
+// the Coast Cruiser convertible (open top, no cabin box), and real car
+// detail: wheels, headlights, taillights and a long sunset shadow.
 import { CAR_TYPES } from './config.js';
 import { clamp, dist2, angleLerp, wrapAngle } from './random.js';
 import { nearestRoadCoord, roadLines, citySize } from './city.js';
+import { tyrePenalty } from './spikestrip.js';
 
 export function makeCar(type, x, z, angle, opts = {}) {
   return {
@@ -19,6 +24,8 @@ export function makeCar(type, x, z, angle, opts = {}) {
     callsign: opts.callsign || null, unit: opts.unit || null,
     condition: 100, health: 100, burning: false, fire: 0,
     wreck: false, explodeTimer: 0, exploded: false, smoke: 0,
+    // v4: flat tyre state from spike strips, and the nitro launch timer.
+    flatTyre: false, flatTimer: 0, tyreSide: 0, nitroBoost: 0,
   };
 }
 
@@ -114,22 +121,43 @@ export function stepBurning(cars, dt) {
 // Player driving: arcade handling — steer harder at low speed, handbrake drifts.
 // stats is the garage-effective stat block (top/accel/brake/grip); when the
 // caller passes nothing, the car's base type is used unchanged.
+// v4: a flat tyre (spike strip) cuts top speed to 55% and grip to 60%
+// and pulls the car to one side; NITRO fires a launch boost while the
+// car is near standstill and the driver floors it.
 export function stepPlayerCar(car, input, dt, stats) {
   const s = stats || car.type;
+  const pen = tyrePenalty(car);
   const fwd = input.forward();
   const steer = input.steer();
-  if (fwd > 0) car.speed += s.accel * dt;
-  else if (fwd < 0) car.speed -= (car.speed > 0.5 ? s.brake : s.accel * 0.6) * dt;
+  // NITRO launch: from a standstill, flooring it adds the launch bonus
+  // for the first second of the run, then fades.
+  let accel = s.accel;
+  if ((s.nitroLaunch || 0) > 0 && fwd > 0 && Math.abs(car.speed) < 6) {
+    car.nitroBoost = Math.min(1, (car.nitroBoost || 0) + dt * 2);
+    accel += s.nitroLaunch * car.nitroBoost;
+  } else {
+    car.nitroBoost = Math.max(0, (car.nitroBoost || 0) - dt * 1.5);
+  }
+  if (fwd > 0) car.speed += accel * dt;
+  else if (fwd < 0) car.speed -= (car.speed > 0.5 ? s.brake : accel * 0.6) * dt;
   else car.speed -= Math.sign(car.speed) * Math.min(Math.abs(car.speed), 6 * dt);
   if (input.handbrake()) car.speed -= Math.sign(car.speed) * Math.min(Math.abs(car.speed), 18 * dt);
-  car.speed = clamp(car.speed, -s.top * 0.45, s.top);
-  const turn = steer * s.grip * dt * clamp(Math.abs(car.speed) / 8, 0, 1) * (car.speed < 0 ? -1 : 1);
+  const top = s.top * pen.top;
+  car.speed = clamp(car.speed, -top * 0.45, top);
+  const grip = (s.grip || car.type.grip) * pen.grip;
+  const turn = steer * grip * dt * clamp(Math.abs(car.speed) / 8, 0, 1) * (car.speed < 0 ? -1 : 1);
   car.angle += turn * (input.handbrake() ? 1.6 : 1);
+  // A flat tyre pulls the car sideways, toward the burst side.
+  if (car.flatTyre && Math.abs(car.speed) > 4) car.angle += pen.pull * 0.12 * dt * Math.abs(car.speed) / 10;
   car.x += Math.sin(car.angle) * car.speed * dt;
   car.z += Math.cos(car.angle) * car.speed * dt;
+  // v4 coast driving: cars can drive onto the beach as far as the boat
+  // dock (beachZ + 40) — beach driving is a GTA tradition — but not out
+  // to the pier end, which is a foot walkway (mission 11's finale).
   const half = citySize() / 2 + 30;
+  const beachEdge = citySize() / 2 + 18 + 40;
   car.x = clamp(car.x, -half, half);
-  car.z = clamp(car.z, -half, half);
+  car.z = clamp(car.z, -half, beachEdge);
 }
 
 export function nearestCar(cars, x, z, maxDist) {
@@ -144,6 +172,10 @@ export function nearestCar(cars, x, z, maxDist) {
 
 // Boxes the engine draws for a car (body + cabin + headlights glow).
 // A wreck is a charred, smoking shell; a burning car flickers orange.
+// v4 detail: four wheels with bright rims, two headlights and two red
+// taillights, a long sunset shadow stretched east, and the Coast
+// Cruiser convertible shows an open top (no cabin box) with two seats.
+// A flat tyre leans the car to the burst side and puffs grey smoke.
 export function carBoxes(car, time = 0) {
   if (car.wreck) {
     return [
@@ -154,10 +186,45 @@ export function carBoxes(car, time = 0) {
     ];
   }
   const c = car.police ? [0.93, 0.93, 0.96] : car.color;
+  const fx = Math.sin(car.angle), fz = Math.cos(car.angle);
+  const rx = Math.cos(car.angle), rz = -Math.sin(car.angle);
+  const lean = car.flatTyre ? (car.tyreSide || 1) * 0.06 : 0;
   const boxes = [
-    { x: car.x, y: 0.55, z: car.z, w: 2.0, h: 0.75, d: 4.4, color: c, yaw: car.angle },
-    { x: car.x, y: 1.15, z: car.z - 0.2, w: 1.7, h: 0.6, d: 2.2, color: [0.08, 0.1, 0.16], yaw: car.angle },
+    // Long sunset shadow, stretched east away from the low sun.
+    { x: car.x + 1.6, y: 0.06, z: car.z + 0.35, w: 2.6, h: 0.08, d: 5.2, color: [0.14, 0.1, 0.08], yaw: car.angle },
+    { x: car.x, y: 0.55, z: car.z, w: 2.0, h: 0.75, d: 4.4, color: c, yaw: car.angle + lean },
   ];
+  // Convertible: open top with two seats, no cabin box.
+  if (car.type && car.type.id === 'convertible') {
+    boxes.push({ x: car.x, y: 1.0, z: car.z - 0.5, w: 0.7, h: 0.5, d: 0.7, color: [0.9, 0.85, 0.8], yaw: car.angle });
+    boxes.push({ x: car.x, y: 1.0, z: car.z + 0.5, w: 0.7, h: 0.5, d: 0.7, color: [0.9, 0.85, 0.8], yaw: car.angle });
+    boxes.push({ x: car.x, y: 1.05, z: car.z, w: 1.6, h: 0.35, d: 3.6, color: [0.15, 0.12, 0.14], yaw: car.angle });
+  } else {
+    boxes.push({ x: car.x, y: 1.15, z: car.z - 0.2, w: 1.7, h: 0.6, d: 2.2, color: [0.08, 0.1, 0.16], yaw: car.angle });
+  }
+  // Four wheels with bright rims, two headlights, two taillights.
+  for (const [wx, wz] of [[-0.95, 1.5], [0.95, 1.5], [-0.95, -1.5], [0.95, -1.5]]) {
+    boxes.push({
+      x: car.x + rx * wx + fx * wz, y: 0.32, z: car.z + rz * wx + fz * wz,
+      w: 0.28, h: 0.64, d: 0.64, color: [0.08, 0.08, 0.1], yaw: car.angle,
+    });
+    boxes.push({
+      x: car.x + rx * wx * 1.12 + fx * wz, y: 0.32, z: car.z + rz * wx * 1.12 + fz * wz,
+      w: 0.1, h: 0.4, d: 0.4, color: [0.85, 0.85, 0.9], yaw: car.angle,
+    });
+  }
+  boxes.push({ x: car.x - rx * 0.6 + fx * 2.25, y: 0.6, z: car.z - rz * 0.6 + fz * 2.25, w: 0.5, h: 0.3, d: 0.15, color: [1, 0.95, 0.7], yaw: car.angle });
+  boxes.push({ x: car.x + rx * 0.6 + fx * 2.25, y: 0.6, z: car.z + rz * 0.6 + fz * 2.25, w: 0.5, h: 0.3, d: 0.15, color: [1, 0.95, 0.7], yaw: car.angle });
+  boxes.push({ x: car.x - rx * 0.6 - fx * 2.25, y: 0.65, z: car.z - rz * 0.6 - fz * 2.25, w: 0.5, h: 0.28, d: 0.15, color: [0.9, 0.1, 0.15], yaw: car.angle });
+  boxes.push({ x: car.x + rx * 0.6 - fx * 2.25, y: 0.65, z: car.z + rz * 0.6 - fz * 2.25, w: 0.5, h: 0.28, d: 0.15, color: [0.9, 0.1, 0.15], yaw: car.angle });
+  // Nitro flame when the launch boost is firing.
+  if ((car.nitroBoost || 0) > 0.3) {
+    boxes.push({ x: car.x - fx * 2.6, y: 0.7, z: car.z - fz * 2.6, w: 0.8, h: 0.8, d: 0.8, color: [1, 0.55, 0.1], yaw: 0 });
+  }
+  // Flat tyre: grey smoke puff from the burst corner.
+  if (car.flatTyre) {
+    boxes.push({ x: car.x + rx * (car.tyreSide || 1) * 1.1, y: 1.2 + Math.sin(time * 5) * 0.2, z: car.z, w: 1.0, h: 1.0, d: 1.0, color: [0.5, 0.5, 0.52], yaw: 0 });
+  }
   if (car.burning) {
     const flick = 0.7 + Math.sin(time * 18) * 0.3;
     boxes.push({ x: car.x, y: 1.6, z: car.z, w: 1.8, h: 1.2, d: 3.6, color: [1, 0.45 * flick, 0.08], yaw: car.angle });

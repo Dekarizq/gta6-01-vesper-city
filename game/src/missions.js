@@ -1,20 +1,24 @@
-// missions.js — the 10-mission story of the Sunset Kings (v3): Mara Voss,
+// missions.js — the 12-mission story of the Sunset Kings (v4): Mara Voss,
 // getaway driver with one week before Hurricane Ilsa drowns the city,
 // works for fixer Dario Kess to buy her way out — and along the way she
 // builds a crew and a reputation. Each mission is a chain of go-to steps;
 // finishing one pays cash and respect, and the crew bonuses stack: Lena
-// adds 10% mission cash, Rook cuts garage prices, Dario doubles streaks.
-// EVERY step sits on a road intersection (roadCross), so building
-// collision can never trap a target — the old (0,0) Storm Spire targets
-// are gone. v3 mission 3 now ends at the Sunset Garage, and mission 10
-// is the coronation run: finish it and Mara is the Sunset King.
+// adds 10% mission cash, Rook cuts garage prices, Dario doubles streaks,
+// and Kai adds 15% side-job cash once he joins on the coast.
+// EVERY step sits on a road intersection (roadCross) or a named coast
+// point (pier, boardwalk, boat dock), so building collision can never
+// trap a target — the old (0,0) Storm Spire targets are gone. v3 mission
+// 3 now ends at the Sunset Garage, mission 10 is the coronation run,
+// and v4 adds missions 11-12 (see missions-extra.js): the Tide Runner
+// chase down the pier, and the King of the Sunset finale on the coast.
 import { roadCross } from './city.js';
+import { buildExtraMissions } from './missions-extra.js';
 
 function pt(x, z, text, kind) { return { x, z, text, kind: kind || 'goto' }; }
 function cross(ix, iz, text, kind) { const p = roadCross(ix, iz); return pt(p.x, p.z, text, kind); }
 
-export function buildMissions(city) {
-  return [
+export function buildMissions(city, coast) {
+  const base = [
     { id: 1, title: 'First Fare', giver: 'Dario Kess', reward: 350, respect: 120,
       intro: 'Dario: "Seven days till the storm, Mara. Drive like you mean it."',
       steps: [cross(1, 1, 'Pick up the courier on Sunset Mile', 'pickup'),
@@ -56,6 +60,11 @@ export function buildMissions(city) {
       steps: [cross(4, 5, 'Reach the spire corner in the eye of the storm', 'goto'),
               cross(5, 9, 'Escape to the harbor with the fund', 'escape')] },
   ];
+  // v4: missions 11-12 live on the coast — the Tide Kings move in the
+  // day after the coronation, and the story continues onto the pier.
+  // When no coast is passed (unit tests), the base 10 still stand.
+  if (coast) return base.concat(buildExtraMissions(coast));
+  return base;
 }
 
 export function createMissionState(missions) {

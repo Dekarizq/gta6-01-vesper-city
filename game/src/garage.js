@@ -3,8 +3,11 @@
 // title. Upgrades are bought with real cash, saved with the game, and they
 // change how the car actually drives: engine raises top speed and
 // acceleration, armour raises the damage the car can take before it burns,
-// tyres raise grip so the car turns harder at speed. Rook the mechanic
-// knocks 15% off every price once he joins the crew. Pure logic, no DOM,
+// tyres raise grip so the car turns harder at speed, and v4 NITRO adds a
+// launch boost that fires when you floor it from a standstill — the
+// street-race job was built for it. Rook the mechanic knocks 15% off
+// every price once he joins the crew, and any visit to the yard also
+// patches a flat tyre from a spike strip, free. Pure logic, no DOM,
 // no network — the world loop calls buyUpgrade when Mara stands in the
 // garage yard and presses G, and applyUpgrades whenever she gets in a car.
 import { clamp } from './random.js';
@@ -26,12 +29,17 @@ export const GARAGE_UPGRADES = [
     costs: [300, 700, 1200],
     gripBonus: [0.4, 0.9, 1.5],
   },
+  {
+    id: 'nitro', name: 'NITRO', blurb: 'Launch boost — floor it from a standstill and fly',
+    costs: [500, 1100, 2000],
+    topBonus: [2, 5, 8], accelBonus: [4, 9, 14],
+  },
 ];
 
 export function createGarage() {
   return {
     owned: ['sedan'],
-    upgrades: { engine: 0, armour: 0, tires: 0 },
+    upgrades: { engine: 0, armour: 0, tires: 0, nitro: 0 },
     car: 'sedan',
     lastBought: null,
   };
@@ -65,20 +73,27 @@ export function buyUpgrade(garage, cash, id, crewDiscount = 0) {
 }
 
 // Effective driving stats for a car type with the garage upgrades applied.
+// NITRO stacks on top of the engine: its top bonus adds to the engine's,
+// and its launch bonus is strongest from a standstill (the vehicle code
+// applies it when speed is near zero).
 export function applyUpgrades(carType, upgrades) {
-  const u = upgrades || { engine: 0, armour: 0, tires: 0 };
+  const u = upgrades || { engine: 0, armour: 0, tires: 0, nitro: 0 };
   const eng = GARAGE_UPGRADES[0];
   const arm = GARAGE_UPGRADES[1];
   const tir = GARAGE_UPGRADES[2];
+  const nit = GARAGE_UPGRADES[3];
   const e = clamp(u.engine || 0, 0, 3);
   const a = clamp(u.armour || 0, 0, 3);
   const t = clamp(u.tires || 0, 0, 3);
+  const n = clamp(u.nitro || 0, 0, 3);
   return {
-    top: carType.top + (e > 0 ? eng.topBonus[e - 1] : 0),
+    top: carType.top + (e > 0 ? eng.topBonus[e - 1] : 0) + (n > 0 ? nit.topBonus[n - 1] : 0),
     accel: carType.accel + (e > 0 ? eng.accelBonus[e - 1] : 0),
     brake: carType.brake,
     grip: carType.grip + (t > 0 ? tir.gripBonus[t - 1] : 0),
     armourBonus: a > 0 ? arm.armourBonus[a - 1] : 0,
+    nitro: n,
+    nitroLaunch: n > 0 ? nit.accelBonus[n - 1] : 0,
   };
 }
 
@@ -95,7 +110,7 @@ export function garageLoad(data) {
   if (!data) return g;
   if (Array.isArray(data.owned) && data.owned.length > 0) g.owned = [...data.owned];
   if (data.upgrades) {
-    for (const id of ['engine', 'armour', 'tires']) {
+    for (const id of ['engine', 'armour', 'tires', 'nitro']) {
       const v = data.upgrades[id];
       if (Number.isInteger(v)) g.upgrades[id] = clamp(v, 0, 3);
     }
@@ -105,13 +120,22 @@ export function garageLoad(data) {
 }
 
 // The garage yard marker: a gold sign slab over the garage landmark so the
-// player can find it from down the street, plus a parked show car.
-export function garageBoxes(landmark, time) {
+// player can find it from down the street, plus a parked show car — and
+// in v4 a second show car, the Coast Cruiser convertible, with a NITRO
+// flame box over it when the nitro is fitted.
+export function garageBoxes(landmark, time, upgrades) {
   if (!landmark) return [];
   const pulse = 1 + Math.sin(time * 2) * 0.08;
-  return [
+  const boxes = [
     { x: landmark.x, y: 6, z: landmark.z, w: 10 * pulse, h: 1.6, d: 0.6, color: [1, 0.72, 0.2], yaw: 0 },
     { x: landmark.x, y: 2.4, z: landmark.z, w: 2.0, h: 0.75, d: 4.4, color: [0.95, 0.68, 0.18], yaw: 0.4 },
     { x: landmark.x, y: 3.0, z: landmark.z - 0.2, w: 1.7, h: 0.6, d: 2.2, color: [0.08, 0.1, 0.16], yaw: 0.4 },
+    { x: landmark.x + 7, y: 2.4, z: landmark.z + 3, w: 2.0, h: 0.7, d: 4.2, color: [0.2, 0.7, 0.9], yaw: -0.3 },
   ];
+  if (upgrades && (upgrades.nitro || 0) > 0) {
+    const flick = 0.7 + Math.sin(time * 18) * 0.3;
+    boxes.push({ x: landmark.x + 7, y: 1.4, z: landmark.z + 5.2, w: 0.9, h: 0.9, d: 0.9, color: [1, 0.5 * flick, 0.1], yaw: 0 });
+  }
+  return boxes;
 }
+

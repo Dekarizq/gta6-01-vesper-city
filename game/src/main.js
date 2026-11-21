@@ -1,14 +1,16 @@
-// main.js — boot and the one loop for Vesper City: Golden Hour — Sunset Kings.
-// ?shot=start|chase|street|mission stages a deterministic frozen scene and
-// sets window.__shotReady once it has settled, for screenshots. Otherwise the
-// game runs from the title screen: start, drive, steal, run missions, tune
-// the car at the Sunset Garage, switch radio stations, build respect and a
-// crew, outrun the named VCPD units, and save — all offline, all procedural,
-// no network requests.
-import { STEP, SAVE_KEY, GAME_TITLE } from './config.js';
+// main.js — boot and the one loop for Vesper City: Golden Hour — Sunset Kings v4.
+// ?shot=start|chase|street|mission|coast|wheel stages a deterministic frozen
+// scene and sets window.__shotReady once it has settled, for screenshots.
+// Otherwise the game runs from the title screen: start, drive, steal, run
+// missions, tune the car at the Sunset Garage, switch radio stations, build
+// respect and a crew, outrun the named VCPD units, and save — all offline,
+// all procedural, no network requests. v4: hold Q for the weapon wheel
+// (tap Q still starts a mission), J for side jobs, L for the GPS route,
+// K to cycle save slots, and the coast — pier, boardwalk, boats — is open.
+import { STEP, SAVE_KEY, GAME_TITLE, WHEEL_HOLD_MS } from './config.js';
 import { createRandom } from './random.js';
 import { createGame, SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSED, SCREEN_DEAD } from './world.js';
-import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM, ACT_WEAPON1, ACT_WEAPON2, ACT_WEAPON3, ACT_GARAGE, ACT_RADIO } from './input.js';
+import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM, ACT_WEAPON1, ACT_WEAPON2, ACT_WEAPON3, ACT_WEAPON4, ACT_GARAGE, ACT_RADIO, ACT_JOB, ACT_GPS, ACT_SLOT } from './input.js';
 import { createEngine, chaseCamera, collideCamera } from './engine.js';
 import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
@@ -45,8 +47,8 @@ function startNew() {
   screen = SCREEN_PLAY;
   hud.hideTitle(); hud.hidePause(); hud.hideDead();
   audio.unlock();
-  hud.message('Welcome to Vesper City, Sunset King. Press Q to start your first mission — and find the Sunset Garage when you have cash.', 6);
-  announce('Playing Vesper City: Golden Hour — Sunset Kings.');
+  hud.message('Welcome to Vesper City, Sunset King. Tap Q to start your first mission, hold Q for the weapon wheel, J for side jobs — and find the Sunset Garage when you have cash.', 7);
+  announce('Playing Vesper City: Golden Hour — Sunset Kings v4.');
 }
 
 function continueSaved() {
@@ -86,6 +88,10 @@ hud.bindButtons({
 });
 
 function handleActions() {
+  // v4 weapon wheel: a quick Q tap arrives here as ACT_MISSION (the
+  // input queues it on release); a hold opens the wheel in frame()
+  // instead, and the release there locks the weapon in.
+  input.takeQtap();
   const a = input.takeActions();
   if (screen === SCREEN_TITLE) {
     if (a & ACT_CONFIRM) startNew();
@@ -106,12 +112,37 @@ function handleActions() {
   if (a & ACT_WEAPON1) api.changeWeapon(0);
   if (a & ACT_WEAPON2) api.changeWeapon(1);
   if (a & ACT_WEAPON3) api.changeWeapon(2);
+  if (a & ACT_WEAPON4) api.changeWeapon(3);
   if (a & ACT_GARAGE) api.cycleGarageUpgrade();
   if (a & ACT_RADIO) { const s = api.nextRadio(); if (audio.setRadioStation) audio.setRadioStation(s.id); }
   if (a & ACT_MISSION) api.startMission();
+  if (a & ACT_JOB) { const j = api.startSideJob(); if (j && audio.horn) audio.horn(); }
+  if (a & ACT_GPS) api.toggleGps();
+  if (a & ACT_SLOT) api.cycleSaveSlot();
   if (a & ACT_RESTART) api.restartMission();
   if (a & ACT_MAP) { game.mapOpen = !game.mapOpen; hud.toggleMap(game.mapOpen); }
   if (a & ACT_MUTE) { const m = audio.toggleMute(); hud.message(m ? 'Sound muted.' : 'Sound on.', 2); }
+}
+
+// v4: the weapon wheel lives on the frame loop, not on actions: while
+// Q is held past the hold time the wheel opens, the mouse picks the
+// slot, and releasing Q locks it in.
+function handleWheel() {
+  if (screen !== SCREEN_PLAY) return;
+  const wheel = game.wheel;
+  if (!wheel) return;
+  if (input.qDown() && input.qHeldMs() > WHEEL_HOLD_MS && !wheel.open) {
+    api.openWheel();
+    input.markQWheelOpened();
+    if (audio.wheelTick) audio.wheelTick();
+  }
+  if (wheel.open) {
+    const m = input.mouse();
+    const before = wheel.hovered;
+    api.wheelHover(m.x, m.y);
+    if (wheel.hovered !== before && audio.wheelTick) audio.wheelTick();
+  }
+  if (input.takeQRelease() && wheel.open) api.closeWheel();
 }
 
 function frame(now) {
@@ -119,6 +150,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - (frame.last || now)) / 1000 || STEP);
   frame.last = now;
   handleActions();
+  handleWheel();
   if (screen === SCREEN_PLAY && !game.frozen) {
     api.step(dt, input, audio);
     if (game.screen === SCREEN_DEAD) { screen = SCREEN_DEAD; hud.showDead(); }

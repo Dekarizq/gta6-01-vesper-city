@@ -36,7 +36,8 @@ export function createAudio() {
   }
 
   // One radio note: a triangle pluck with a soft decay, plus its octave
-  // shimmer on the Storm Radio station.
+  // shimmer on the Storm Radio station — and a soft fifth on Coast 104.7,
+  // the beach-nights station, so it shimmers a different way.
   function radioNote(freq, dur) {
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -54,6 +55,28 @@ export function createAudio() {
       g2.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.2, dur));
       o2.connect(g2); g2.connect(radioGain); o2.start(t); o2.stop(t + Math.max(0.25, dur) + 0.05);
     }
+    if (radioStation === 'coast') {
+      const o3 = ctx.createOscillator(); o3.type = 'sine'; o3.frequency.value = freq * 1.5;
+      const g3 = ctx.createGain();
+      g3.gain.setValueAtTime(0.0001, t);
+      g3.gain.exponentialRampToValueAtTime(0.04, t + 0.03);
+      g3.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.2, dur));
+      o3.connect(g3); g3.connect(radioGain); o3.start(t); o3.stop(t + Math.max(0.25, dur) + 0.05);
+    }
+  }
+
+  // v4 one-shots: a soft tick as the weapon wheel spins past a slot,
+  // a countdown beep for the street race, a horn for the taxi job, and
+  // the hiss of a tyre going down on a spike strip.
+  function blip(freq, dur, vol, type) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = type || 'sine'; o.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
   }
 
   return {
@@ -109,6 +132,11 @@ export function createAudio() {
         o.connect(g); g.connect(master); o.start(t + i * 0.09); o.stop(t + i * 0.09 + 0.55);
       });
     },
+    // v4: wheel tick, race countdown beep, taxi horn, spike hiss.
+    wheelTick() { blip(1200, 0.07, 0.12, 'square'); },
+    raceBeep(final) { blip(final ? 1320 : 880, final ? 0.35 : 0.15, 0.2, 'sine'); },
+    horn() { blip(420, 0.25, 0.18, 'sawtooth'); blip(530, 0.25, 0.14, 'sawtooth'); },
+    spikeHiss() { blip(220, 0.5, 0.1, 'sawtooth'); },
     toggleMute() {
       muted = !muted;
       if (master) master.gain.value = muted ? 0 : 0.5;

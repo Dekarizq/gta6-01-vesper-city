@@ -52,3 +52,25 @@ export function shuffle(rng, arr) {
   }
   return out;
 }
+
+// v4 helpers, shared by the coast, the GPS and the spike strips.
+// pickN: n distinct items from an array, in seeded order. angleDiff:
+// the signed shortest turn from a to b, in (-PI, PI]. clampAngle: wrap
+// an angle into (-PI, PI]. smoothstep: the classic 0..1 ease used by
+// the tide and the sun-lane slide.
+export function pickN(rng, arr, n) {
+  return shuffle(rng, arr).slice(0, Math.min(n, arr.length));
+}
+export function angleDiff(a, b) {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+export function clampAngle(a) {
+  return wrapAngle(a);
+}
+export function smoothstep(t) {
+  const x = clamp01(t);
+  return x * x * (3 - 2 * x);
+}

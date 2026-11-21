@@ -1,15 +1,17 @@
-// collectibles.js — Sun Coins: 24 golden coins hidden across Vesper City.
+// collectibles.js — Sun Coins: 30 golden coins hidden across Vesper City.
 // A free-roam side hunt for the golden hour: each coin is a spinning gold
-// slab at a named crossing, worth a chime and a HUD count. Grab all 24 in
+// slab at a named crossing, worth a chime and a HUD count. Grab all 30 in
 // one in-game day and Dario pays a $500 bonus. At dawn the coins come back —
 // the city re-hides them every morning, so the hunt never truly ends.
 // Pure logic: no DOM, no network, no randomness at runtime. The coin spots
 // sit on road intersections (roadCross), so every coin is reachable on foot
 // or by car, and the save file remembers which ones today already took.
+// v4 adds six coast coins along the south beach road (the iz=9 line):
+// the hunt now runs from Sunset Mile all the way to the pier.
 
 import { roadCross } from './city.js';
 
-export const SUN_COIN_COUNT = 24;
+export const SUN_COIN_COUNT = 30;
 export const SUN_COIN_BONUS = 500;
 // v3: every Sun Coin also pays respect — the hunt feeds the Sunset Kings
 // ladder, and a chained streak pays respect on top of cash.
@@ -52,6 +54,13 @@ const SPOTS = [
   { ix: 6, iz: 7, name: 'Boardwalk end' },
   { ix: 3, iz: 7, name: 'Dune Path' },
   { ix: 7, iz: 7, name: 'Surfer\'s corner' },
+  // v4 coast coins, on the south beach road by the pier and boardwalk.
+  { ix: 2, iz: 9, name: 'Pier gate' },
+  { ix: 4, iz: 9, name: 'Boardwalk steps' },
+  { ix: 6, iz: 9, name: 'Tide Bar corner' },
+  { ix: 8, iz: 9, name: 'Boat Dock turn' },
+  { ix: 3, iz: 9, name: 'Lifeguard crossing' },
+  { ix: 7, iz: 9, name: 'Sunset Pier approach' },
 ];
 
 function dist2(ax, az, bx, bz) {
@@ -80,7 +89,7 @@ export function createCollectibles() {
   }
 
   return {
-    // How many coins are on the map in total (always 24).
+    // How many coins are on the map in total (30 in v4: 24 city + 6 coast).
     total: coins.length,
     // How many Mara has pocketed today.
     count() { return collectedToday; },

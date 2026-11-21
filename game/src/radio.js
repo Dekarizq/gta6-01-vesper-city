@@ -1,11 +1,13 @@
-// radio.js — three real radio stations, all procedural. No audio files,
+// radio.js — four real radio stations, all procedural. No audio files,
 // no network: each station is a tempo, a root note and a scale, and the
 // world loop asks radioStep for the next note, which the audio engine
 // plays as a short synth pluck. Switching stations with R changes the
 // music immediately and the HUD shows the station name and show. The
 // stations are the city's own voices: Vesper 98.1 is the warm golden-hour
 // mix, Sunset FM is the fast coast-drive station, Storm Radio is the slow
-// moody weather band that plays as the hurricane closes in.
+// moody weather band that plays as the hurricane closes in, and v4 adds
+// Coast 104.7, the beach-nights station that only sounds right with the
+// windows down on the Shore boulevard.
 export const RADIO_STATIONS = [
   {
     id: 'vesper', name: 'VESPER 98.1', show: 'Golden Hour Mix',
@@ -21,6 +23,11 @@ export const RADIO_STATIONS = [
     id: 'storm', name: 'STORM RADIO 87.9', show: 'Weather Band',
     tempo: 72, root: 174.61, scale: [0, 3, 5, 6, 10, 12],
     mood: 'slow hurricane blues',
+  },
+  {
+    id: 'coast', name: 'COAST 104.7', show: 'Beach Nights',
+    tempo: 112, root: 164.81, scale: [0, 2, 3, 7, 9, 12],
+    mood: 'beach night groove',
   },
 ];
 

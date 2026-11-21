@@ -1,17 +1,20 @@
-// Vesper City: Golden Hour — Sunset Kings (v3) — built by simedhol's recorded session:
+// Vesper City: Golden Hour — Sunset Kings v4 — built by simedhol's recorded session:
 // a raw-WebGL 3D open-world crime game (procedural golden-hour city, driving,
-// carjacking, police wanted 0-5 with named VCPD units and the CONDOR-1
-// helicopter, 10 story missions, 3 weapons, armour, building collision,
-// Sunset Garage upgrades, 3 procedural radio stations, respect ranks and
-// crew, and cars that burn and explode into smoking wrecks).
+// carjacking, police wanted 0-6 with named VCPD units, spike strips and the
+// CONDOR-1 helicopter, 12 story missions, 4 weapons incl. the Golden
+// 12-Gauge shotgun on a hold-Q weapon wheel, armour, building collision,
+// Sunset Garage upgrades incl. NITRO, 4 procedural radio stations, respect
+// ranks and crew, cars that burn and explode into smoking wrecks, the
+// Sunset Beach coast with a pier, boardwalk and boats, repeatable side jobs
+// — taxi, delivery, street race — a GPS route line, and 3 save slots).
 // A working gta6-01 entry (Node 22, standard library only): the game is this directory's
 // game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
 // modules, no library and no network request), and the program hands it in. It copies game/ and
 // screenshots/ from beside this file to /output and writes /output/dossier.json, the summary the
 // judge reads, with the vendored make.fun library. The four screenshots in screenshots/ are the
-// cover (chase), the mission, the street and the title screen — regenerate them with the
-// ?shot= queries in shots.json whenever the game changes, so the dossier always shows the
-// game as it really plays now.
+// cover (coast chase on the pier), the mission, the weapon wheel and the title screen —
+// regenerate them with the ?shot= queries in shots.json whenever the game changes, so the
+// dossier always shows the game as it really plays now. v4 shots: coast, mission, wheel, start.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:

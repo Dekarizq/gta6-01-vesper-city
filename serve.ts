@@ -37,8 +37,10 @@ const MIME: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-// Vesper City: Golden Hour — Sunset Kings (v3) — serves the game on http://localhost:8080 for local play.
-// Garage, radio, respect and wrecks are all in the static game/ files; nothing here fetches the network.
+// Vesper City: Golden Hour — Sunset Kings v4 — serves the game on http://localhost:8080 for local play.
+// Garage, radio, respect, wrecks, coast, side jobs, GPS and the weapon wheel are all in the
+// static game/ files; nothing here fetches the network. HEAD requests get headers only,
+// so screenshot tools can probe a file without downloading it.
 createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://localhost');
   let pathname: string;
@@ -68,7 +70,8 @@ createServer((request, response) => {
     'content-length': size,
     'cache-control': 'no-store',
   });
+  if (request.method === 'HEAD') { response.end(); return; }
   createReadStream(file).pipe(response);
 }).listen(port, '127.0.0.1', () => {
-  console.log(`Vesper City: Golden Hour — game/ is on http://localhost:${port}`);
+  console.log(`Vesper City: Golden Hour — Sunset Kings v4 — game/ is on http://localhost:${port}`);
 });

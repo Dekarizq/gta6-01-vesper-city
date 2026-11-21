@@ -1,6 +1,9 @@
 // pedestrians.js — people on the sidewalks: walkers, runners, and the
 // occasional victim of the player's crimes. They flee from gunfire and cars,
 // and building collision keeps them out of towers just like the player.
+// v4 adds beachgoers on the coast: sunbathers on towels, walkers on the
+// sand, and surfers paddling out to sea — the coast module owns their
+// look, this module owns the shared walker behaviour they build on.
 import { clamp, dist2 } from './random.js';
 import { citySize, nearestRoadCoord, resolveBuildingCollision } from './city.js';
 
@@ -81,6 +84,45 @@ export function stepPedestrians(peds, dt, player, cars, gunshot, buildings) {
       if (Math.abs(p.z - rz) < 2 && Math.abs(p.x - rx) > 2) p.z += (p.z < rz ? -1 : 1) * dt * 2;
     }
   }
+}
+
+// Beachgoers for the coast: the same walker shape, but they spawn on
+// the sand with beach shirts and a beach kind ('sunbathe', 'walk' or
+// 'surf'), so the coast can place a crowd without duplicating the
+// pedestrian code. The coast module steps them; this is the spawner.
+export function spawnBeachgoers(rng, count, beachZ, size) {
+  const towels = [
+    [1, 0.45, 0.3], [0.3, 0.7, 0.95], [0.95, 0.8, 0.3],
+    [0.75, 0.5, 0.95], [0.4, 0.85, 0.5], [0.95, 0.55, 0.2],
+  ];
+  const out = [];
+  for (let i = 0; i < count; i += 1) {
+    out.push({
+      x: clamp(-size / 2 + 30 + rng.range(0, size - 60), -size / 2 + 6, size / 2 - 6),
+      z: beachZ + rng.range(-8, 10),
+      angle: rng.range(0, Math.PI * 2),
+      speed: rng.range(1.0, 1.8),
+      shirt: towels[rng.int(0, towels.length - 1)],
+      flee: 0, dead: false, bob: rng.range(0, 6),
+      crew: null, beach: i % 3 === 0 ? 'sunbathe' : 'walk',
+    });
+  }
+  return out;
+}
+
+// A beachgoer who hears a gunshot or sees a fast car runs for the
+// boardwalk, not into the sea — fleeing toward the city, away from
+// the water, is the only sane direction on a beach.
+export function stepBeachgoer(p, dt, player, gunshot) {
+  if (p.dead) return;
+  if (gunshot || dist2(p.x, p.z, player.x, player.z) < 25) {
+    p.flee = 2;
+    p.angle = Math.atan2(p.x - player.x, (p.z - player.z) - 20);
+    p.speed = 5;
+    p.x += Math.sin(p.angle) * p.speed * dt;
+    p.z += Math.cos(p.angle) * p.speed * dt;
+  }
+  if (p.flee > 0) p.flee -= dt;
 }
 
 export function pedBoxes(p) {

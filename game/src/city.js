@@ -3,6 +3,10 @@
 // south shore, and a low sun down the west boulevard. Pure data: the engine
 // turns it into geometry, the minimap turns it into a map. Also owns building
 // collision (circle vs tower footprint) and the sun-visibility ray check.
+// v4: the south shore is a real district now — Sunset Beach, with the pier,
+// the boardwalk and the boat dock as landmarks the GPS and the coast
+// missions navigate to, and more neon signs on the towers so the city
+// glows harder at golden hour.
 import { WORLD, DISTRICTS, GOLD, WINDOW_STRIP, SUN } from './config.js';
 
 export function citySize() {
@@ -46,11 +50,18 @@ export function districtAt(x, z) {
   const size = citySize();
   const fx = (x + size / 2) / size;
   const fz = (z + size / 2) / size;
+  // v4: past the south road line is the beach, not the docks.
+  if (fz > 0.94) return DISTRICTS[5]; // Sunset Beach (sand, pier, sea)
   if (fz > 0.82) return DISTRICTS[1]; // Harbor Docks (south)
   if (fx > 0.36 && fx < 0.64 && fz > 0.3 && fz < 0.7) return DISTRICTS[3]; // Glass Quarter downtown
   if (fx < 0.3 && fz < 0.4) return DISTRICTS[0]; // Sunset Mile NW
   if (fx > 0.7) return DISTRICTS[4]; // Sunset Shore east
   return DISTRICTS[2]; // Old Vesper
+}
+
+// The coast band: the z where the city ends and the beach begins.
+export function coastLineZ() {
+  return citySize() / 2 + 4;
 }
 
 // Circle (x,z,r) vs a building footprint: true when they overlap.
@@ -128,13 +139,23 @@ export function generateCity(rng) {
         const base = [palette[0] * shade, palette[1] * shade, palette[2] * shade];
         const strip = WINDOW_STRIP[rng.int(0, WINDOW_STRIP.length - 1)];
         buildings.push({ x: cx + ox, z: cz + oz, w, d, h, color: base, district: districtAt(cx, cz).name, strip });
-        // A bright sign on the tallest face of some buildings.
-        if (rng.next() < 0.5 && h > 10) {
-          const c = rng.pick(['#ff9a3d', '#ffd166', '#fda4af', '#7dd3fc']);
+        // A bright sign on the tallest face of some buildings. v4: more
+        // signs, and a second, smaller sign lower down on the tallest
+        // towers — the neon is what makes the golden hour read as a city
+        // that is awake, not a model.
+        if (rng.next() < 0.62 && h > 10) {
+          const c = rng.pick(['#ff9a3d', '#ffd166', '#fda4af', '#7dd3fc', '#ff5c5c', '#a5f3fc']);
           signs.push({
             x: cx + ox, y: rng.range(h * 0.45, h * 0.85), z: cz + oz + d / 2 + 0.25,
             w: rng.range(3, 8), h: rng.range(0.8, 1.6), d: 0.4, color: c,
           });
+          if (h > 34 && rng.next() < 0.5) {
+            signs.push({
+              x: cx + ox, y: rng.range(4, h * 0.3), z: cz + oz + d / 2 + 0.25,
+              w: rng.range(2, 5), h: rng.range(0.6, 1.1), d: 0.4,
+              color: rng.pick(['#ffd166', '#7dd3fc', '#fda4af']),
+            });
+          }
         }
         // Rooftop beacon on tall towers.
         if (h > 40) {
@@ -167,6 +188,11 @@ export function generateCity(rng) {
     { id: 'rainmarket', name: 'Sunset Shore', x: size / 2 - 30, z: -size / 2 + 60 },
     { id: 'hospital', name: 'St. Mara Hospital', x: -size / 2 + 60, z: size / 2 - 60 },
     { id: 'garage', name: 'Sunset Garage', x: garageX, z: garageZ },
+    // v4 coast landmarks: the pier, the boardwalk and the boat dock.
+    { id: 'pier', name: 'Sunset Pier', x: -20, z: size / 2 + 82 },
+    { id: 'boardwalk', name: 'Sunset Boardwalk', x: 60, z: size / 2 + 20 },
+    { id: 'boatdock', name: 'Boat Dock', x: 110, z: size / 2 + 56 },
+    { id: 'beach', name: 'Sunset Beach', x: 0, z: size / 2 + 18 },
   ];
   return { size, lines, buildings, signs, palms, umbrellas, landmarks };
 }

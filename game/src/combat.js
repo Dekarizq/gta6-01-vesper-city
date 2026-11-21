@@ -1,5 +1,8 @@
-// combat.js — on-foot combat for Sunset Kings (v3): FISTS (infinite),
-// VESPER 9MM (72 rounds) and MAKO SMG (150 rounds), switched with 1/2/3.
+// combat.js — on-foot combat for Sunset Kings (v4): FISTS (infinite),
+// VESPER 9MM (72 rounds), MAKO SMG (150 rounds) and the new GOLDEN
+// 12-GAUGE shotgun (40 shells), switched with 1/2/3/4 or the weapon
+// wheel (hold Q). The shotgun is a close-range spread gun: a wide
+// firing cone, heavy damage per hit, and a slow pump between shots.
 // Shots cost ammo and can hit pedestrians, police, and — new in v3 —
 // cars: put enough rounds into a cruiser and it catches fire, then
 // explodes. Killing a cop raises the wanted level and pays respect.
@@ -27,9 +30,36 @@ export function switchWeapon(combat, index) {
   return true;
 }
 
+// Damage per hit, by weapon. The shotgun hits twice as hard as the
+// pistol — two shells light a cruiser up, where the pistol needs three.
+export function weaponDamage(weapon) {
+  if (weapon.id === 'shotgun') return 60;
+  if (weapon.id === 'smg') return 26;
+  if (weapon.id === 'pistol') return 34;
+  return 12; // fists, via punch(), not here
+}
+
+// Firing-cone half-width, in world units at the target: the shotgun
+// sprays wide, the pistol and SMG stay tight.
+export function weaponSpread(weapon) {
+  return weapon.id === 'shotgun' ? 4.6 : 2.2;
+}
+
+// Top up ammo — the garage sells shells and SMG rounds, and side jobs
+// sometimes pay in ammo instead of cash. Never exceeds 2x the weapon's
+// starting load, so the player cannot stockpile forever.
+export function giveAmmo(combat, index, amount) {
+  if (index < 1 || index >= WEAPONS.length) return 0;
+  const cap = WEAPONS[index].ammo * 2;
+  const before = combat.ammo[index];
+  combat.ammo[index] = Math.min(cap, before + amount);
+  return combat.ammo[index] - before;
+}
+
 // Fire the current weapon in the player's facing direction. Returns a hit
 // description, { kind: 'dry' } when out of ammo, or null on cooldown.
-// Cars take 34 damage per hit — three pistol hits light a cruiser up.
+// Cars take 34 damage per pistol hit — three pistol hits light a
+// cruiser up; the shotgun does 60, so two shells do the same job.
 export function shoot(combat, player, peds, cops, time, cars = []) {
   const weapon = WEAPONS[combat.weapon];
   if (combat.cooldown > 0 || time - combat.lastShot < weapon.cooldown) return null;
@@ -40,33 +70,36 @@ export function shoot(combat, player, peds, cops, time, cars = []) {
   combat.cooldown = weapon.cooldown;
   combat.lastShot = time;
   combat.shotsFired += 1;
-  combat.muzzle = 0.12;
+  combat.muzzle = weapon.id === 'shotgun' ? 0.22 : 0.12;
+  combat.lastWeapon = weapon.id;
   const fx = Math.sin(player.angle), fz = Math.cos(player.angle);
   let best = null, bestD = weapon.range;
+  const spread = weaponSpread(weapon);
   const consider = (x, z, kind, ref) => {
     const dx = x - player.x, dz = z - player.z;
     const along = dx * fx + dz * fz;
     if (along < 1 || along > bestD) return;
     const side = Math.abs(dx * fz - dz * fx);
-    if (side < 2.2) { bestD = along; best = { kind, ref, dist: along }; }
+    if (side < spread) { bestD = along; best = { kind, ref, dist: along }; }
   };
   for (const p of peds) if (!p.dead) consider(p.x, p.z, 'ped', p);
   for (const c of cops) if (!c.wreck) consider(c.x, c.z, 'cop', c);
   for (const car of cars) if (!car.wreck && !car.police) consider(car.x, car.z, 'car', car);
-  if (!best) return { kind: 'miss', dist: weapon.range };
+  if (!best) return { kind: 'miss', dist: weapon.range, weapon: weapon.id };
+  const dmg = weaponDamage(weapon);
   if (best.kind === 'ped') {
     best.ref.dead = true;
     combat.kills += 1;
-    return best;
+    return { ...best, weapon: weapon.id, damage: dmg };
   }
   if (best.kind === 'car') {
-    const result = damageCar(best.ref, 34);
-    return { kind: 'car', ref: best.ref, dist: best.dist, damage: result };
+    const result = damageCar(best.ref, dmg);
+    return { kind: 'car', ref: best.ref, dist: best.dist, damage: result, weapon: weapon.id };
   }
   // A cop car hit: the officer is hit and the cruiser takes the damage too.
-  const result = damageCar(best.ref, 34);
+  const result = damageCar(best.ref, dmg);
   combat.kills += 1;
-  return { kind: 'cop', ref: best.ref, dist: best.dist, damage: result };
+  return { kind: 'cop', ref: best.ref, dist: best.dist, damage: result, weapon: weapon.id };
 }
 
 // Melee: punch the nearest pedestrian within 2.5 units (FISTS).

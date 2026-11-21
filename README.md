@@ -4,7 +4,18 @@
 [![rank](https://make.fun/badge/gta6-01/Dekarizq/gta6-01-vesper-city/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 [![reward](https://make.fun/badge/gta6-01/Dekarizq/gta6-01-vesper-city/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
-Vesper City: Golden Hour — Sunset Kings — a sun-soaked open-world crime game in the spirit of GTA 6, built for make.fun's "Make GTA 6" bounty ($1,666 in USDC). Play as Mara Voss, getaway driver, through 10 story missions in a golden-hour coastal city under a 7-day hurricane countdown: drive and steal cars, outrun the police (wanted level 0-5, roadblocks, the CONDOR-1 helicopter with a searchlight, and named VCPD units with RAM / PIT / PURSUIT tactics), fight on foot with three weapons (FISTS, VESPER 9MM, MAKO SMG), and follow the dense HUD and circular minimap. Raw WebGL, no libraries, no network requests — fully offline static files.
+Vesper City: Golden Hour — Sunset Kings v4 — a sun-soaked open-world crime game in the spirit of GTA 6, built for make.fun's "Make GTA 6" bounty ($1,666 in USDC). Play as Mara Voss, getaway driver, through 12 story missions in a golden-hour coastal city under a 7-day hurricane countdown: drive and steal cars, outrun the police (wanted level 0-6, roadblocks, spike strips, the CONDOR-1 helicopter with a searchlight, and named VCPD units with RAM / PIT / PURSUIT / SPIKE / BLOCKADE tactics), fight on foot with four weapons (FISTS, VESPER 9MM, MAKO SMG, GOLDEN 12-GAUGE shotgun on a hold-Q weapon wheel), work side jobs on the Sunset Beach coast, and follow the GPS route line on the dense HUD and circular minimap. Raw WebGL, no libraries, no network requests — fully offline static files.
+
+## Sunset Kings v4 — what v4 adds
+
+- **Weapon wheel**: hold Q and the wheel opens — FISTS, VESPER 9MM, MAKO SMG and the new GOLDEN 12-GAUGE shotgun. Point the mouse at a slot and release Q to lock it in. A quick tap of Q still starts the next story mission.
+- **Missions 11–12 on the coast**: "Tide Runner" chases the rival Tide Kings down the pier and boardwalk; "King of the Sunset" is the finale on the pier at sunset, with a $1,000 crown bonus. 12 missions total.
+- **Sunset Beach coast**: a wooden pier over the sunset water, a boardwalk with stalls, a boat dock with five bobbing boats, a lifeguard tower, surfers, sunbathers, and a tide that breathes in and out. The beach is a district of its own now.
+- **Side jobs (J)**: repeatable taxi fares, dock deliveries and street races against the clock — paid in cash and respect, with a par-time bonus on races. NITRO (new garage upgrade) was built for the race starts.
+- **Spike strips & wanted 6**: at 4+ stars, VCPD-52 (Ofc. Duarte) lays spike strips across the road ahead. A flat tyre cuts top speed and grip until Rook patches it free at the Sunset Garage. Six stars brings five cruisers at once.
+- **GPS route**: a gold trail on the road and the minimap leads to the live mission step or job target, with the next turn and distance on the HUD chip. Toggle with L.
+- **Save slots (K)**: three slots — slot 1 autosaves after every mission and job, slots 2–3 are your checkpoints. Cycle with K.
+- **Visual polish**: warmer fog and deeper sun shading, a bigger sun halo, long sunset shadows under every car, wheels / headlights / taillights / rims on every car, an open-top Coast Cruiser convertible, and a bigger, lower CONDOR-1 with a red cheatline and a fatter searchlight.
 
 ## Sunset Kings — what v3 adds
 
@@ -24,7 +35,7 @@ Vesper City: Golden Hour — Sunset Kings — a sun-soaked open-world crime game
 node serve.ts
 ```
 
-Then open http://localhost:8080 in desktop Chrome. Controls: WASD/arrows drive & walk, E steal car, F/click shoot, 1/2/3 switch weapon, G Sunset Garage, R radio station, Space handbrake, Shift sprint/boost, Q mission, T restart mission, M map, P pause, U mute.
+Then open http://localhost:8080 in desktop Chrome. Controls: WASD/arrows drive & walk, E steal car, F/click shoot, 1/2/3/4 switch weapon, hold Q weapon wheel / tap Q mission, G Sunset Garage, R radio station (4 stations), J side job, L GPS route, K save slot, Space handbrake, Shift sprint/boost, T restart mission, M map, P pause, U mute.
 
 ---
 

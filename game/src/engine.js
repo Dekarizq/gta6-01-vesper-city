@@ -3,7 +3,10 @@
 // fog), boxes only: the whole city is one static vertex buffer; cars, people,
 // the helicopter and markers are drawn from a small dynamic buffer rebuilt
 // each frame. The low sun itself is a second, unfogged emissive program so
-// its disc stays bright down the west boulevard.
+// its disc stays bright down the west boulevard. v4 polish: warmer fog
+// and a stronger sun-side shade so the sunset reads on every face, a
+// bigger sun halo, and long ground shadows under cars and people cast
+// away from the low sun — the cheapest depth cue a box city can buy.
 import { clamp } from './random.js';
 import { SUN } from './config.js';
 
@@ -17,13 +20,15 @@ void main(){
   vColor = aColor;
   vFog = clamp(-wp.z / 300.0, 0.0, 1.0);
   float n = max(dot(normalize(aNormal), normalize(vec3(-0.85, 0.3, 0.2))), 0.0);
-  vShade = 0.62 + 0.5 * n;
+  // v4: deeper shade range — sun faces glow, shadow faces go properly
+  // warm-dark, so the low sun models the towers instead of washing them.
+  vShade = 0.55 + 0.62 * n;
 }`;
 const FRAG = `
 precision mediump float;
 varying vec3 vColor; varying float vFog; varying float vShade;
 void main(){
-  vec3 fogColor = vec3(0.58, 0.36, 0.2);
+  vec3 fogColor = vec3(0.66, 0.40, 0.22);
   vec3 c = vColor * vShade;
   gl_FragColor = vec4(mix(c, fogColor, vFog), 1.0);
 }`;
@@ -211,6 +216,9 @@ export function createEngine(canvas, city) {
   const sunArrays = { pos: [], nor: [], col: [] };
   pushBox(sunArrays, SUN.x, SUN.y, SUN.z, 0.6, 36, 36, SUN.color, 0);
   pushBox(sunArrays, SUN.x, SUN.y, SUN.z, 0.4, 52, 52, [0.95, 0.55, 0.25], 0);
+  // v4: a wider, fainter halo around the disc so the sun bleeds into
+  // the sky instead of ending in a hard edge.
+  pushBox(sunArrays, SUN.x, SUN.y, SUN.z, 0.3, 78, 78, [0.85, 0.42, 0.18], 0);
   const sunBuf = buildBuffer(gl, sunArrays);
 
   const dynBuf = gl.createBuffer();
@@ -280,6 +288,21 @@ export function createEngine(canvas, city) {
       return dynCount;
     },
   };
+}
+
+// Long shadows point away from the low western sun: east and a touch
+// south, stretched 1.6x. Cars and people draw a flat dark box offset
+// by this, which grounds them on the road instead of floating on it.
+export function sunShadow() {
+  return { dx: 1.6, dz: 0.35, len: 1.6 };
+}
+
+// The sunset sky colour at a moment in the day: deep gold at 18:48,
+// sliding toward ember red as the hurricane countdown advances.
+export function skyColor(elapsed, dayLength = 240) {
+  const day = Math.min(6, Math.floor(elapsed / dayLength));
+  const t = day / 6;
+  return [0.62 - t * 0.12, 0.38 - t * 0.14, 0.2 - t * 0.04];
 }
 
 // Fire colour for a burning car: it flickers between deep orange and

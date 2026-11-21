@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vesper City: Golden Hour — Sunset Kings — open-world crime game</title>
+<meta name="description" content="Vesper City: Golden Hour — Sunset Kings v4. Open-world crime game: 12 story missions, weapon wheel, Sunset Beach coast with pier and boats, side jobs, spike strips, wanted 0-6, GPS route, 3 save slots. Raw WebGL, offline.">
+<title>Vesper City: Golden Hour — Sunset Kings v4 — open-world crime game</title>
 <link rel="icon" href="data:,">
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #2a1a0e;
@@ -43,6 +44,26 @@
   .mission-next { font-size: 13px; font-weight: 800; color: #facc15; margin-top: 2px; }
   #hud-vcpd { position: absolute; left: 16px; top: 340px; width: 300px; background: rgba(20,10,2,.78);
     border: 1px solid #7dd3fc; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  #hud-jobs { position: absolute; left: 16px; top: 640px; width: 300px; background: rgba(20,10,2,.78);
+    border: 1px solid #34d399; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  #hud-gps { position: absolute; left: 50%; top: 64px; transform: translateX(-50%);
+    background: rgba(20,10,2,.78); border: 1px solid #ffd166; border-radius: 8px; padding: 6px 14px;
+    font-size: 13px; font-weight: 700; color: #facc15; text-shadow: 0 1px 4px #000; }
+  #hud-coast { position: absolute; right: 16px; top: 200px; text-align: right; font-size: 13px; font-weight: 700;
+    color: #7dd3fc; text-shadow: 0 1px 4px #000; }
+  #hud-slots { position: absolute; right: 16px; top: 222px; text-align: right; font-size: 12px;
+    color: #d6d3d1; text-shadow: 0 1px 4px #000; }
+  #weapon-wheel { position: absolute; left: 50%; top: 50%; width: 320px; height: 320px;
+    transform: translate(-50%, -50%); display: none; pointer-events: none; }
+  .wheel-title { position: absolute; left: 50%; top: -34px; transform: translateX(-50%);
+    font-size: 13px; font-weight: 800; letter-spacing: 2px; color: #ffd166; white-space: nowrap;
+    text-shadow: 0 2px 8px #000; }
+  .wheel-slot { position: absolute; width: 120px; margin-left: -60px; margin-top: -26px; text-align: center;
+    font-size: 12px; font-weight: 800; color: #e7e5e4; background: rgba(0,0,0,.6);
+    border: 2px solid #777; border-radius: 8px; padding: 8px 4px; }
+  .wheel-slot span { color: #fcd34d; }
+  .wheel-slot.hovered { border-color: #ffd166; color: #ffd166; background: rgba(60,30,0,.85); transform: scale(1.12); }
+  .wheel-slot.active { border-color: #34d399; }
   .vcpd-head { font-size: 12px; font-weight: 800; letter-spacing: 1px; color: #fda4af; margin-bottom: 6px; }
   .vcpd-row { display: flex; justify-content: space-between; padding: 2px 0; color: #fef3c7; }
   .vcpd-status { color: #7dd3fc; font-weight: 700; }
@@ -96,7 +117,7 @@
 </style>
 </head>
 <body>
-<canvas id="game" aria-label="Vesper City: Golden Hour — Sunset Kings — open-world crime game. Drive, steal cars, tune the garage, build respect, run missions, outrun the police."></canvas>
+<canvas id="game" aria-label="Vesper City: Golden Hour — Sunset Kings v4 — open-world crime game. Drive, steal cars, tune the garage, hold Q for the weapon wheel, run 12 missions, work side jobs on the coast, outrun the police."></canvas>
 <canvas id="rain"></canvas>
 <div id="hud"></div>
 <p id="status" role="status" aria-live="polite"></p>
