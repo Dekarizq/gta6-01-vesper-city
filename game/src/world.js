@@ -12,6 +12,7 @@ import { spawnPedestrians, stepPedestrians, pedBoxes } from './pedestrians.js';
 import { createPolice, addWanted, stepPolice, heliBoxes, copStatus } from './police.js';
 import { buildMissions, createMissionState, currentMission, currentStep, updateMission } from './missions.js';
 import { createCombat, shoot, punch, stepCombat, switchWeapon, currentWeapon } from './combat.js';
+import { createCollectibles, SUN_COIN_BONUS } from './collectibles.js';
 
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -21,6 +22,7 @@ export const SCREEN_DEAD = 'dead';
 export function createGame(rng) {
   const city = generateCity(rng);
   const missions = buildMissions(city);
+  const coins = createCollectibles();
   const size = citySize();
   const player = {
     x: 0, z: 40, angle: 0, speed: 0, health: PLAYER.health, armour: PLAYER.armour,
@@ -28,7 +30,7 @@ export function createGame(rng) {
   };
   const game = {
     city, missions: createMissionState(missions), police: createPolice(), combat: createCombat(),
-    player, cash: 250, elapsed: 0, time: 0, screen: SCREEN_TITLE,
+    coins, player, cash: 250, elapsed: 0, time: 0, screen: SCREEN_TITLE,
     traffic: [], peds: [], garage: ['sedan'], ramTimer: 0,
     msg: null, gunshot: false, mapOpen: false, muted: false, frozen: false,
     stats: { carsStolen: 0, missionsDone: 0, kills: 0 },
@@ -45,6 +47,7 @@ export function createGame(rng) {
     game.missions = createMissionState(missions);
     game.police = createPolice();
     game.combat = createCombat();
+    coins.reset();
     game.stats = { carsStolen: 0, missionsDone: 0, kills: 0 };
     game.traffic = spawnTraffic(rng, 16, player.x, player.z);
     game.peds = spawnPedestrians(rng, 26, player.x, player.z);
@@ -63,6 +66,7 @@ export function createGame(rng) {
     if (Array.isArray(data.ammo)) game.combat.ammo = data.ammo;
     game.police.wanted = data.wanted || 0;
     game.garage = data.garage || ['sedan'];
+    if (data.coins) coins.load(data.coins);
     game.traffic = spawnTraffic(rng, 16, player.x, player.z);
     game.peds = spawnPedestrians(rng, 26, player.x, player.z);
     game.screen = SCREEN_PLAY;
@@ -236,6 +240,23 @@ export function createGame(rng) {
         game.msg += ` Garage unlocked a ${u}!`;
       }
     }
+    // --- Sun Coins: the golden-hour side hunt ---
+    for (const ev of coins.update(dt, p.x, p.z, game.elapsed)) {
+      if (ev.type === 'pickup') {
+        game.msg = `Sun Coin ${ev.collected}/${ev.total} — ${ev.name}!`;
+        if (audio) audio.chime();
+      } else if (ev.type === 'complete') {
+        game.cash += SUN_COIN_BONUS;
+        game.msg = `All ${coins.total} Sun Coins! Dario pays the $${ev.bonus} bonus.`;
+        if (audio) audio.chime();
+      } else if (ev.type === 'streak') {
+        game.cash += ev.bonus;
+        game.msg = `Sun Streak x${ev.streak}! Dario slips you $${ev.bonus} for the hot run.`;
+        if (audio) audio.chime();
+      } else if (ev.type === 'respawn') {
+        game.msg = `Day ${ev.day} dawns — the Sun Coins are hidden again.`;
+      }
+    }
     // --- golden hour: the morning rain has cleared to a light drizzle ---
     game.rain = clamp(0.12 + (game.elapsed / (WORLD.dayLength * WORLD.stormDays)) * 0.1, 0.12, 0.25);
     // --- death ---
@@ -288,6 +309,8 @@ export function createGame(rng) {
       );
     }
     boxes.push(...heliBoxes(game.police.heli, time, player));
+    // Sun Coins still on the map, spinning gold at their crossings.
+    boxes.push(...coins.boxes(time));
     // Muzzle flash.
     if (game.combat.muzzle > 0) {
       boxes.push({ x: p.x + Math.sin(p.angle) * 1.2, y: 1.0, z: p.z + Math.cos(p.angle) * 1.2, w: 0.6, h: 0.6, d: 0.6, color: [1, 0.9, 0.4], yaw: 0 });
@@ -318,6 +341,7 @@ export function createGame(rng) {
       missionGiver: m ? m.giver : null,
       missionStep: game.missions.active ? step : null,
       radio: RADIO_STATIONS[Math.floor(game.elapsed / 60) % RADIO_STATIONS.length],
+      coins: { collected: coins.count(), total: coins.total, hint: coins.nearest(player.x, player.z) },
       objective: game.missions.active && m && step ? {
         title: m.title,
         text: step.text,

@@ -14,7 +14,7 @@ export function saveGame(state) {
     x: state.player.x, z: state.player.z, angle: state.player.angle,
     missionIndex: state.missions.index, missionDone: state.missions.done,
     wanted: state.police.wanted, elapsed: state.elapsed,
-    garage: state.garage, savedAt: Date.now(),
+    garage: state.garage, coins: state.coins ? state.coins.save() : null, savedAt: Date.now(),
   };
   try { window.localStorage.setItem(SAVE_KEY, JSON.stringify(data)); return true; }
   catch { return false; }

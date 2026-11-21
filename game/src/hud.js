@@ -13,7 +13,7 @@ export function createHud(city) {
     <div id="hud-top-left" class="hud-panel"><div id="hud-cash">$0</div>
       <div id="hud-health"><div id="hud-health-fill"></div></div>
       <div id="hud-armour"><div id="hud-armour-fill"></div></div>
-      <div id="hud-car"></div></div>
+      <div id="hud-car"></div><div id="hud-coins"></div></div>
     <div id="hud-top-right" class="hud-panel"><div id="hud-wanted-label">WANTED</div><div id="hud-stars"></div>
       <div id="hud-weapons"></div>
       <div id="hud-storm"></div><div id="hud-district"></div><div id="hud-radio"></div></div>
@@ -51,7 +51,7 @@ export function createHud(city) {
   const drops = [];
   for (let i = 0; i < 80; i += 1) drops.push({ x: Math.random(), y: Math.random(), s: 0.4 + Math.random() * 0.6 });
   let msgTimer = 0;
-  let lastCash = -1, lastStars = -1, lastWeapons = '';
+  let lastCash = -1, lastStars = -1, lastWeapons = '', lastCoins = '';
 
   function fmtCash(v) { return '$' + Math.floor(v).toLocaleString('en-US'); }
 
@@ -134,6 +134,11 @@ export function createHud(city) {
       $('hud-health-fill').style.background = state.health > 50 ? '#34d399' : state.health > 25 ? '#f59e0b' : '#ef4444';
       $('hud-armour-fill').style.width = Math.max(0, state.armour) + '%';
       $('hud-car').textContent = state.carName ? '🚗 ' + state.carName : 'On foot — press E near a car to steal it';
+      const cKey = state.coins ? `${state.coins.collected}/${state.coins.total}` : '';
+      if (cKey !== lastCoins) {
+        $('hud-coins').textContent = state.coins ? `☀ SUN COINS ${cKey}` : '';
+        lastCoins = cKey;
+      }
       if (state.wanted !== lastStars) {
         $('hud-stars').innerHTML = Array.from({ length: WANTED_MAX }, (_, i) =>
           `<span class="star ${i < state.wanted ? 'on' : ''}">★</span>`).join('');

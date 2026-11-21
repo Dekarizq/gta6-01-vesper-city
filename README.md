@@ -6,6 +6,10 @@
 
 Vesper City: Golden Hour — a sun-soaked open-world crime game in the spirit of GTA 6, built for make.fun's "Make GTA 6" bounty ($1,666 in USDC). Play as Mara Voss, getaway driver, through 10 story missions in a golden-hour coastal city under a 7-day hurricane countdown: drive and steal cars, outrun the police (wanted level 0-5, roadblocks, a visible helicopter with a searchlight), fight on foot with three weapons (FISTS, VESPER 9MM, MAKO SMG), and follow the dense HUD and circular minimap. Raw WebGL, no libraries, no network requests — fully offline static files.
 
+## Sun Coins — the golden-hour side hunt
+
+24 golden Sun Coins hide at named crossings across the city, from Sunset Mile to Surfer's corner. Drive or walk over one to pocket it — the HUD chip counts them (☀ SUN COINS n/24), and the nearest one is always a short drive away. Grab coins quickly to build a Sun Streak: every 6th chained coin pays a $50 streak bonus. Collect all 24 in one in-game day and Dario pays a $500 bonus. At dawn the coins are hidden again, so the hunt resets every morning. Progress saves with the game.
+
 ## Run it
 
 ```sh
