@@ -19,7 +19,7 @@
 // businesses that pay daily income, and a three-mission arc (13-15)
 // crowns her King of Vesper — gated on a level-2 business and 2,000
 // respect. The save key is new so a v6 save never collides with a v5 one.
-export const GAME_TITLE = 'Vesper City: Golden Hour — Sunset Kings v6';
+export const GAME_TITLE = 'Vesper City: Golden Hour — Sunset Kings v7';
 export const WORLD = {
   block: 44,          // size of one city block (world units)
   blocks: 9,          // blocks across (city spans blocks*block + roads)
@@ -35,7 +35,12 @@ export const PLAYER = { walkSpeed: 7, sprintSpeed: 11, health: 100, armour: 100,
 // v4: the heat goes to 6 stars. Six stars means five cruisers, CONDOR-1,
 // a roadblock AND spike strips — the full VCPD response.
 export const WANTED_MAX = 6;
-export const SAVE_KEY = 'vesper-city-golden-hour-v6-save-v1';
+export const SAVE_KEY = 'vesper-city-golden-hour-v7-save-v1';
+// v7: Ember Isle across the ferry — a second map, a volcano, its own
+// police, jobs, businesses and radio. The save key is new so a v6 save
+// never collides with a v7 save.
+export const ISLAND_FERRY_FARE = 50;
+export const ISLAND_MISSION_COUNT = 20;
 export const WEAPONS = [
   { id: 'fists', name: 'FISTS', ammo: Infinity, cooldown: 0.35, range: 3 },
   { id: 'pistol', name: 'VESPER 9MM', ammo: 72, cooldown: 0.28, range: 60 },
@@ -90,7 +95,7 @@ export const GOLD = {
   rose: [0.72, 0.42, 0.38],
 };
 export const WINDOW_STRIP = ['#ffd166', '#7dd3fc', '#fda4af', '#fbbf24'];
-export const RADIO_STATIONS = ['VESPER 98.1 · Golden Hour Mix', 'SUNSET FM 101.5 · Coast Drive', 'STORM RADIO 87.9 · Weather Band', 'COAST 104.7 · Beach Nights', 'MARINA 99.9 · Yacht Rock', 'HURRICANE 88.8 · Storm Watch'];
+export const RADIO_STATIONS = ['VESPER 98.1 · Golden Hour Mix', 'SUNSET FM 101.5 · Coast Drive', 'STORM RADIO 87.9 · Weather Band', 'COAST 104.7 · Beach Nights', 'MARINA 99.9 · Yacht Rock', 'HURRICANE 88.8 · Storm Watch', 'EMBER 107.3 · Volcano Rock'];
 // Named VCPD units: every cruiser and the helicopter have a callsign, an
 // officer, and a tactic, so the pursuit panel reads like a real dispatch.
 // v4 adds the SPIKE unit (Ofc. Duarte, lays spike strips at 4+ stars)

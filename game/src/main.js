@@ -1,5 +1,5 @@
-// main.js — boot and the one loop for Vesper City: Golden Hour — Sunset Kings v6.
-// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown|storm|business stages a deterministic frozen
+// main.js — boot and the one loop for Vesper City: Golden Hour — Sunset Kings v7.
+// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown|storm|business|arc|ferry|volcano|island|ember stages a deterministic frozen
 // scene and sets window.__shotReady once it has settled, for screenshots.
 // Otherwise the game runs from the title screen: start, drive, steal, run
 // missions, tune the car at the Sunset Garage, switch radio stations, build
@@ -55,7 +55,7 @@ function startNew() {
   hud.hideTitle(); hud.hidePause(); hud.hideDead();
   audio.unlock();
   hud.message('Welcome to Vesper City, Sunset King. Tap Q to start your first mission, hold Q for the weapon wheel, J for side jobs, B near a FOR SALE board to buy a business — and watch the sky: the hurricane front is coming.', 7);
-  announce('Playing Vesper City: Golden Hour — Sunset Kings v6.');
+  announce('Playing Vesper City: Golden Hour — Sunset Kings v7. The ferry to Ember Isle leaves from Sunset Pier — $50, or free if you own a business.');
 }
 
 function continueSaved() {

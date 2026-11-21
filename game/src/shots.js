@@ -1,5 +1,5 @@
-// shots.js — deterministic screenshot scenes for Sunset Kings (v6) behind
-// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown|storm|business|arc. Each stages the real game
+// shots.js — deterministic screenshot scenes for Sunset Kings (v7) behind
+// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown|storm|business|arc|ferry|volcano|island|ember. Each stages the real game
 // state and then FREEZES it (game.frozen): the main loop draws the staged
 // frame but the world does not advance, so the car, the cops, the
 // helicopter and the burning wreck stay exactly where they were placed.
@@ -19,6 +19,13 @@
 // sign and level pips overhead, mission 13 active), and the arc hero
 // (the King of Vesper finale, mission 15, at dusk in the Storm Chaser
 // with the level-2 fish market behind her).
+// v7 adds the island heroes: the ferry hero (mid-crossing, the boat
+// under Mara and the volcano ahead), the volcano hero (the Ember
+// Buggy on the north road with the lava cone in frame and the island
+// patrol closing in), the island hero (the King of Ember finale,
+// mission 20, at the night market with the church and the volcano
+// behind), and the ember hero (Mara on foot at the resort she owns,
+// its gold sign and level pips overhead, mission 16 active).
 import { SCREEN_PLAY } from './world.js';
 import { addWanted } from './police.js';
 import { makeCar } from './vehicles.js';
@@ -29,6 +36,10 @@ import { currentStep } from './missions.js';
 import { gpsSetTarget, gpsUpdate } from './gps.js';
 import { forceWeather } from './weather.js';
 import { buyBusiness as buyBiz, upgradeBusiness as upgradeBiz } from './business.js';
+import { buyIslandBusiness as buyIslandBiz, upgradeIslandBusiness as upgradeIslandBiz } from './island-business.js';
+import { ISLAND_PATROL_CAR } from './island-police.js';
+import { makeIslandCar } from './island-vehicles.js';
+import { ferryPointAt } from './ferry.js';
 
 // Staged shots are frozen, so the world loop never runs to build the
 // GPS route — pre-compute it here, or every shot's HUD chip reads
@@ -231,6 +242,106 @@ export function stageShot(name, api) {
     stageGps(api);
     game.msg = null;
     game.cash = 50000;
+    return;
+  }
+  if (name === 'ferry') {
+    // v7 hero: the ferry pulling away from Sunset Pier. Mara stands
+    // on the bow looking BACK at Vesper City — the whole boat (white
+    // hull, teal stripe, cabin, sunset-striped funnel) in frame with
+    // the marina, the lighthouse and the golden-hour skyline behind
+    // it, gulls overhead. The crossing is just starting (12%), so the
+    // city is still close enough to see. Mission 16 (Ember Landing)
+    // is active so the HUD shows the island arc starting.
+    game.ferry.state = 'crossing';
+    game.ferry.progress = 0.12;
+    const bp = ferryPointAt(0.12);
+    const ahead = ferryPointAt(0.14);
+    const ang = Math.atan2(ahead.x - bp.x, ahead.z - bp.z);
+    player.inCar = false; player.car = null;
+    player.x = bp.x + Math.sin(ang) * 7; player.z = bp.z + Math.cos(ang) * 7;
+    player.angle = ang + Math.PI; player.speed = 0;
+    addRespect(game.respect, 1800);
+    game.radioState.index = 6; // EMBER 107.3 — Volcano Rock
+    game.missions.index = 15; // Ember Landing
+    api.startMission();
+    stageGps(api);
+    game.msg = null;
+    game.cash = 25000;
+    return;
+  }
+  if (name === 'volcano') {
+    // v7 hero: the Volcano Run on Ember Isle. Mara drives the Ember
+    // Buggy north up the island grid toward the lava cone — close
+    // enough (100m) that the cone looms through the golden-hour haze
+    // with its lava glow on the rim, two island patrol cruisers
+    // closing in ahead of her, and mission 17 active with the GPS
+    // route on. The island flag is set so the island boxes render.
+    // (Staged closer than the first try: at 220m the cone washed
+    // out entirely in the fog — and at 90m it filled the frame as a
+    // flat brown wall. 160m keeps the cone, its lava rim, the road
+    // and the patrol in one picture.)
+    game.island.onIsland = true;
+    const car = makeIslandCar('buggy', 700, 40, Math.PI, { driver: false });
+    player.inCar = true; player.car = car; player.x = 700; player.z = 40; player.angle = Math.PI; player.speed = 18;
+    car.speed = 18;
+    game.islandPolice.wanted = 2;
+    const cop1 = makeCar(ISLAND_PATROL_CAR, 690, -10, 0, { police: true, targetSpeed: 20, callsign: 'EIP-7' });
+    const cop2 = makeCar(ISLAND_PATROL_CAR, 712, -25, 0, { police: true, targetSpeed: 20, callsign: 'EIP-12' });
+    cop1.frozen = true; cop2.frozen = true;
+    cop1.unit = { callsign: 'EIP-7', officer: 'Sgt. Kana', tactic: 'RAM' };
+    cop2.unit = { callsign: 'EIP-12', officer: 'Ofc. Rolo', tactic: 'PIT' };
+    game.islandPolice.cops.push(cop1, cop2);
+    addRespect(game.respect, 2100);
+    game.radioState.index = 6; // EMBER 107.3 — Volcano Rock
+    game.missions.index = 16; // Volcano Run
+    api.startMission();
+    stageGps(api);
+    game.msg = null;
+    game.cash = 32000;
+    return;
+  }
+  if (name === 'island') {
+    // v7 hero: the King of Ember finale, mission 20. Mara drives the
+    // Ember Buggy at the night market with the church and the volcano
+    // behind her, the island business she owns at level 2, respect
+    // over 3,000, and the finale's GPS route on. The gate is genuinely
+    // met here: the resort is bought and upgraded to level 2.
+    game.island.onIsland = true;
+    game.cash = 60000;
+    let r = buyIslandBiz(game.islandBusiness, 'ember-resort', game.cash);
+    if (r.ok) game.cash -= r.cost;
+    r = upgradeIslandBiz(game.islandBusiness, 'ember-resort', game.cash);
+    if (r.ok) game.cash -= r.cost;
+    const car = makeIslandCar('buggy', 680, 90, Math.PI, { driver: false });
+    player.inCar = true; player.car = car; player.x = 680; player.z = 90; player.angle = Math.PI; player.speed = 0;
+    addRespect(game.respect, 3200);
+    game.radioState.index = 6; // EMBER 107.3 — Volcano Rock
+    game.missions.index = 19; // King of Ember
+    api.startMission();
+    stageGps(api);
+    game.msg = null;
+    game.cash = 38000;
+    return;
+  }
+  if (name === 'ember') {
+    // v7 hero: Mara on foot at the Ember Resort she just bought, its
+    // gold sign and level pips overhead, the pool terrace and the
+    // palms in frame, mission 16 (Ember Landing) active with the GPS
+    // route on. She stands north of the resort's own spot, facing
+    // south toward the hotel, so the sign is dead centre in frame.
+    game.island.onIsland = true;
+    game.cash = 50000;
+    const rb = buyIslandBiz(game.islandBusiness, 'ember-resort', game.cash);
+    if (rb.ok) game.cash -= rb.cost;
+    player.inCar = false; player.car = null;
+    player.x = 800; player.z = 96; player.angle = 0;
+    addRespect(game.respect, 2400);
+    game.radioState.index = 6; // EMBER 107.3 — Volcano Rock
+    game.missions.index = 15; // Ember Landing
+    api.startMission();
+    stageGps(api);
+    game.msg = null;
+    game.cash = 38000;
     return;
   }
   if (name === 'wheel') {

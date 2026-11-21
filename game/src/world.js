@@ -40,6 +40,17 @@ import { createDistricts, stepDistricts, districtBoxes, districtNameAt, district
 import { decorateCity, visualsBoxes } from './visuals.js';
 // v6 systems: real weather, buyable businesses, and the story arc.
 import { createWeather, stepWeather, weatherLabel, weatherForecastText, weatherRender, wantedMultiplier, trafficFactor, weatherBoxes, weatherSave, weatherLoad } from './weather.js';
+// v7 systems: Ember Isle — a second map across the ferry, with its own
+// police, jobs, businesses, radio station, vehicles and events.
+import { createIsland, stepIsland, islandBoxes, islandBuildings, islandResolveCollision, isOnIsland, islandDistrictAt, islandLabel, islandSave, islandLoad } from './island.js';
+import { createFerry, ferryStep, ferryBoxes, ferryGullBoxes, ferryBoatPosition, ferryLabel, ferrySave, ferryLoad, FERRY_TERMINAL_CITY, FERRY_TERMINAL_ISLAND } from './ferry.js';
+import { buildIslandMissions, islandGateMet, isIslandMission, ISLAND_FINALE_BONUS, ISLAND_ARC_RESPECT } from './island-missions.js';
+import { createIslandPolice, stepIslandPolice, addIslandWanted, islandPoliceBoxes, islandPoliceLabel, islandPoliceSave, islandPoliceLoad } from './island-police.js';
+import { createIslandJobs, startIslandJob, nextIslandJobType, updateIslandJob, islandJobTarget, islandJobBoxes, islandJobLabel, islandJobsSave, islandJobsLoad } from './island-jobs.js';
+import { EMBER_STATION } from './island-radio.js';
+import { createIslandBusiness, buyIslandBusiness, upgradeIslandBusiness, islandBusinessLevel, islandBusinessCount, collectIslandIncome, nearestIslandBusiness, islandBusinessBoxes, islandBusinessSummary, nextIslandUpgradeHint, islandBusinessSave, islandBusinessLoad } from './island-business.js';
+import { createIslandTraffic, stepIslandTraffic, islandTrafficBoxes, nearestIslandCar, makeIslandCar } from './island-vehicles.js';
+import { createIslandEvents, stepIslandEvents, answerIslandEvent, islandEventReached, islandEventBoxes, islandEventLabel, islandEventsSave, islandEventsLoad } from './island-events.js';
 import { createBusiness, buyBusiness as buyBiz, upgradeBusiness, businessLevel, collectIncome, nearestBusiness, businessBoxes, businessSummary, nextUpgradeHint, businessSave, businessLoad } from './business.js';
 import { ARC_FINALE_BONUS, arcGateMet } from './missions-arc.js';
 import { districtAt } from './city.js';
@@ -59,7 +70,10 @@ export function createGame(rng) {
   decorateCity(city, rng);
   const districts = createDistricts(city);
   const coast = createCoast(city);
-  const missions = buildMissions(city, coast);
+  // v7: Ember Isle is generated before the missions, so the island
+  // arc (missions 16-20) can build its steps on the island points.
+  const island = createIsland(rng);
+  const missions = buildMissions(city, coast, island);
   const coins = createCollectibles();
   const size = citySize();
   const garageLandmark = city.landmarks.find((l) => l.id === 'garage');
@@ -93,6 +107,16 @@ export function createGame(rng) {
     // and the business portfolio (six properties, daily income).
     weather: createWeather(),
     business: createBusiness(),
+    // v7: Ember Isle — the island, the ferry, its police, jobs,
+    // businesses, events and traffic. The island only steps when Mara
+    // is on it; the ferry steps everywhere, because it has to.
+    island,
+    ferry: createFerry(),
+    islandPolice: createIslandPolice(),
+    islandJobs: createIslandJobs(),
+    islandBusiness: createIslandBusiness(),
+    islandEvents: createIslandEvents(),
+    islandTraffic: createIslandTraffic(rng, 10),
     heatTimer: 0,
     lastStrikes: 0,
   };
@@ -128,6 +152,15 @@ export function createGame(rng) {
     // properties — the storm and the portfolio build from nothing.
     game.weather = createWeather();
     game.business = createBusiness();
+    // v7: a new game starts on the city side, the ferry at the pier,
+    // the island untouched — Mara has to earn the crossing.
+    game.island = createIsland(rng);
+    game.ferry = createFerry();
+    game.islandPolice = createIslandPolice();
+    game.islandJobs = createIslandJobs();
+    game.islandBusiness = createIslandBusiness();
+    game.islandEvents = createIslandEvents();
+    game.islandTraffic = createIslandTraffic(rng, 10);
     game.heatTimer = 0;
     game.lastStrikes = 0;
     coast.time = 0; coast.tide = 0;
@@ -172,6 +205,24 @@ export function createGame(rng) {
     // clear evening and an empty portfolio.
     if (data.weather) game.weather = weatherLoad(data.weather);
     if (data.business) game.business = businessLoad(data.business);
+    // v7: restore the island — where Mara was, the ferry side, the
+    // island police heat, jobs, businesses and events. A v6 save has
+    // none of these, so every load is guarded.
+    if (data.island) {
+      const loaded = islandLoad(data.island);
+      if (loaded) {
+        game.island.onIsland = loaded.onIsland;
+        game.island.trips = loaded.trips;
+        game.island.visits = loaded.visits;
+        game.island.time = loaded.time;
+      }
+    }
+    if (data.ferry) { const f = ferryLoad(data.ferry); if (f) game.ferry = f; }
+    if (data.islandPolice) game.islandPolice = islandPoliceLoad(data.islandPolice);
+    if (data.islandJobs) game.islandJobs = islandJobsLoad(data.islandJobs);
+    if (data.islandBusiness) game.islandBusiness = islandBusinessLoad(data.islandBusiness);
+    if (data.islandEvents) game.islandEvents = islandEventsLoad(data.islandEvents);
+    if (game.island.onIsland) game.islandTraffic = createIslandTraffic(rng, 10);
     game.traffic = spawnTraffic(rng, 22, player.x, player.z);
     game.peds = spawnPedestrians(rng, 36, player.x, player.z);
     game.peds.push(...spawnCrew(rng, garageLandmark));
@@ -180,13 +231,23 @@ export function createGame(rng) {
 
   function startMission() {
     const m = currentMission(game.missions);
-    if (!m) { game.msg = 'All 15 missions complete — Vesper City, the coast and the storm are yours, King of Vesper.'; return; }
+    if (!m) { game.msg = 'All 20 missions complete — Vesper City, the coast, the storm and Ember Isle are yours, King of Ember.'; return; }
     // v6: the arc finale (mission 15) is gated — a level-2 business
     // and 2,000 respect, or Dario will not hand Mara the crown.
     if (m.id === 15) {
       const gate = arcGateMet(game.business, game.respect.points);
       if (!gate.ok) {
         game.msg = 'King of Vesper needs more: ' + gate.missing.join(' and ') + '.';
+        return;
+      }
+    }
+    // v7: the island finale (mission 20) is gated harder — an island
+    // business at level 2 and 3,000 respect, or Old Tomas will not
+    // hand Mara the island crown.
+    if (m.id === 20) {
+      const gate = islandGateMet(game.islandBusiness, game.respect.points);
+      if (!gate.ok) {
+        game.msg = 'King of Ember needs more: ' + gate.missing.join(' and ') + '.';
         return;
       }
     }
@@ -205,6 +266,17 @@ export function createGame(rng) {
   // comes first, and the job would fight it for the GPS target.
   function startSideJob() {
     if (game.missions.active) { game.msg = 'Finish the story mission first — then the city has work for you.'; return null; }
+    // v7: on Ember Isle, J starts an island job instead — fishing,
+    // tour or smuggling, cycled the same way as the city jobs.
+    if (game.island.onIsland) {
+      if (game.islandJobs.active) { game.msg = 'Island job already active: ' + game.islandJobs.active.def.name; return game.islandJobs.active; }
+      const type = nextIslandJobType(game.islandJobs);
+      const job = startIslandJob(game.islandJobs, type, game.elapsed);
+      const target = job.steps[0];
+      if (target) gpsSetTarget(game.gps, target);
+      game.msg = `Island job: ${job.def.name} — ${job.def.blurb} $${job.def.pay} on completion.`;
+      return job;
+    }
     if (game.jobs.active) { game.msg = 'Job already active: ' + game.jobs.active.def.name; return game.jobs.active; }
     const type = nextJobType(game.jobs);
     const job = startJob(game.jobs, type, game.elapsed);
@@ -218,6 +290,30 @@ export function createGame(rng) {
   // board it buys; near a business Mara owns it upgrades one level.
   // The cash leaves here, never inside the business module.
   function buyBusiness() {
+    // v7: on Ember Isle, B buys or upgrades an island business
+    // instead — the resort, the bar, the dive shop or the warung.
+    if (game.island.onIsland) {
+      const nearI = nearestIslandBusiness(game.islandBusiness, player.x, player.z);
+      if (!nearI) { game.msg = 'No island business nearby — follow the FOR SALE boards on Ember Isle.'; return null; }
+      if (nearI.dist > 25) {
+        game.msg = `The ${nearI.name} is ${Math.round(nearI.dist)}m away — get closer to buy in.`;
+        return null;
+      }
+      const resultI = nearI.action === 'upgrade'
+        ? upgradeIslandBusiness(game.islandBusiness, nearI.id, game.cash)
+        : buyIslandBusiness(game.islandBusiness, nearI.id, game.cash);
+      if (resultI.ok) {
+        game.cash -= resultI.cost;
+        const level = islandBusinessLevel(game.islandBusiness, nearI.id);
+        const pts = businessRespect(level);
+        const gained = addRespect(game.respect, pts);
+        game.msg = resultI.msg + ` +${pts} respect for owning the island.`;
+        if (gained.rankUp) game.msg += ` Rank up: ${gained.rank.name}!`;
+      } else {
+        game.msg = resultI.msg;
+      }
+      return resultI;
+    }
     const near = nearestBusiness(game.business, player.x, player.z);
     if (!near) { game.msg = 'No business nearby — follow the FOR SALE boards in the Marina, Old Town and the docks.'; return null; }
     if (near.dist > 25) {
@@ -415,6 +511,86 @@ export function createGame(rng) {
       game.lastStrikes = game.weather.strikes;
       if (audio && audio.thunder) audio.thunder();
     }
+    // --- v7 ferry + island: the boat steps every frame, the island
+    // only steps while Mara is on it. A crossing freezes the player
+    // in place and lerps her across the water; arriving flips the
+    // island flag and puts her on the dock.
+    {
+      const moving = input.forward() !== 0 || input.steer() !== 0;
+      const ev = ferryStep(game.ferry, player.x, player.z, dt, moving, player.inCar, game.missions.active,
+        islandBusinessCount(game.islandBusiness) + (game.business ? Object.keys(game.business.owned || {}).length : 0) > 0);
+      if (ev) {
+        if (ev.type === 'departed') {
+          if (ev.cost) game.cash -= ev.cost;
+          game.msg = ev.msg;
+        } else if (ev.type === 'arrived') {
+          const toIsland = ev.side === 'island';
+          game.island.onIsland = toIsland;
+          if (toIsland) {
+            game.island.visits += 1;
+            game.island.trips += 1;
+            player.x = FERRY_TERMINAL_ISLAND.x;
+            player.z = FERRY_TERMINAL_ISLAND.z;
+            player.inCar = false; player.car = null;
+            game.islandTraffic = createIslandTraffic(rng, 10);
+            game.msg = 'Ember Isle — the volcano, the black beach, the whole island is yours to drive.';
+          } else {
+            game.island.trips += 1;
+            player.x = FERRY_TERMINAL_CITY.x;
+            player.z = FERRY_TERMINAL_CITY.z;
+            player.inCar = false; player.car = null;
+            game.msg = 'Back in Vesper City — the ferry ties up at the Sunset Pier.';
+          }
+          player.angle = 0; player.speed = 0;
+        } else if (ev.type === 'boarding') {
+          game.msg = `Ferry boarding — stand still ${ev.secondsLeft}s…`;
+        } else if (ev.type === 'denied') {
+          game.msg = ev.msg;
+        }
+      }
+      if (game.ferry.state === 'crossing') {
+        const bp = ferryBoatPosition(game.ferry, game.time);
+        player.x = bp.x; player.z = bp.z; player.speed = 0;
+      }
+      if (game.island.onIsland) {
+        stepIsland(game.island, dt);
+        stepIslandPolice(game.islandPolice, dt, player, rng, game.islandPolice.wanted, game.time);
+        stepIslandTraffic(game.islandTraffic, dt, rng);
+        // v7: on the island, ramming a patrol car raises island heat —
+        // the city VCPD loop never sees island cops, so the island
+        // answers its own crimes. Without this the patrol could never
+        // appear in real play, because nothing else raises island heat.
+        if (player.inCar && player.car) {
+          for (const cop of game.islandPolice.cops) {
+            if (dist2(cop.x, cop.z, player.x, player.z) < 6 && Math.abs(player.speed) > 8 && game.ramTimer <= 0) {
+              addIslandWanted(game.islandPolice, 1);
+              game.msg = 'You rammed an Ember Patrol cruiser!';
+              player.speed *= 0.5;
+              game.ramTimer = 3;
+              damageCar(cop, 25);
+            }
+          }
+        }
+        const payI = collectIslandIncome(game.islandBusiness, game.weather.day);
+        if (payI > 0) {
+          game.cash += payI;
+          game.msg = `Island business income: +$${payI} for day ${game.weather.day}.`;
+        }
+        const evI = stepIslandEvents(game.islandEvents, dt, game.elapsed, true);
+        if (evI) {
+          if (evI.type === 'started') game.msg = `Island event: ${evI.event.def.name} — ${evI.event.def.blurb}`;
+          else if (evI.type === 'expired') game.msg = `Island event expired: ${evI.event.def.name} — the island moved on.`;
+        }
+        if (islandEventReached(game.islandEvents, player.x, player.z)) {
+          const ans = answerIslandEvent(game.islandEvents);
+          if (ans) {
+            game.cash += ans.pay;
+            addRespect(game.respect, ans.respect);
+            game.msg = `Island event done: ${ans.event.def.name} — earned $${ans.pay}! +${ans.respect} respect.`;
+          }
+        }
+      }
+    }
     // --- v6 night heat: wanted rises faster after dark, and faster
     // still in a storm — the VCPD owns the dark streets.
     if (game.police.wanted > 0 && game.police.wanted < WANTED_MAX) {
@@ -437,7 +613,8 @@ export function createGame(rng) {
     if (p.inCar && p.car) {
       const stats = applyUpgrades(p.car.type, game.garageState.upgrades);
       stepPlayerCar(p.car, input, dt, stats);
-      const fixed = resolveBuildingCollision(p.car.x, p.car.z, 2.2, game.city.buildings);
+      const solids = game.island.onIsland ? islandBuildings(game.island) : game.city.buildings;
+      const fixed = resolveBuildingCollision(p.car.x, p.car.z, 2.2, solids);
       if (fixed.x !== p.car.x || fixed.z !== p.car.z) {
         p.car.speed *= 0.4;
         damageCar(p.car, 6);
@@ -489,10 +666,19 @@ export function createGame(rng) {
       const beachEdge = coast.beachZ + 40;
       const pierLimit = coast.seaZ + 34;
       const south = Math.abs(p.x - coast.points.pierEnd.x) < 10 ? pierLimit : beachEdge;
-      p.x = clamp(p.x, -half, half);
-      p.z = clamp(p.z, -half, south);
-      const fixed = resolveBuildingCollision(p.x, p.z, PLAYER.radius, game.city.buildings);
-      p.x = fixed.x; p.z = fixed.z;
+      if (game.island.onIsland) {
+        // v7: on Ember Isle the clamp is the island itself — the
+        // volcano field in the north and the black beach in the south.
+        p.x = clamp(p.x, 490, 910);
+        p.z = clamp(p.z, -210, 210);
+        const fixedI = islandResolveCollision(p.x, p.z, PLAYER.radius, game.island);
+        p.x = fixedI.x; p.z = fixedI.z;
+      } else {
+        p.x = clamp(p.x, -half, half);
+        p.z = clamp(p.z, -half, south);
+        const fixed = resolveBuildingCollision(p.x, p.z, PLAYER.radius, game.city.buildings);
+        p.x = fixed.x; p.z = fixed.z;
+      }
     }
     // --- world life ---
     for (const car of game.traffic) stepTraffic(car, dt, rng);
@@ -557,6 +743,9 @@ export function createGame(rng) {
       game.msg = `BOOM! The ${ev.car.type.name} blew up! +${RESPECT_POINTS.explosion} respect.`;
       if (gained.rankUp) game.msg += ` Rank up: ${gained.rank.name}!`;
       addWanted(game.police, 1);
+      // v7: an explosion on Ember Isle raises island heat too — the
+      // volcano is not the only thing that burns over there.
+      if (game.island.onIsland) addIslandWanted(game.islandPolice, 1);
     }
     // --- missions ---
     const result = updateMission(game.missions, p.x, p.z, dt);
@@ -592,6 +781,14 @@ export function createGame(rng) {
         game.cash += ARC_FINALE_BONUS;
         game.msg += ` ARC FINALE BONUS +$${ARC_FINALE_BONUS} — you are the King of Vesper!`;
         const fg = addRespect(game.respect, RESPECT_POINTS.finale);
+        if (fg.rankUp) game.msg += ` Rank up: ${fg.rank.name}!`;
+      }
+      // v7 island finale: mission 20 pays the biggest crown bonus, once,
+      // and the whole map — city, coast, storm and island — is won.
+      if (done.id === 20) {
+        game.cash += ISLAND_FINALE_BONUS;
+        game.msg += ` ISLAND FINALE BONUS +$${ISLAND_FINALE_BONUS} — you are the King of Ember!`;
+        const fg = addRespect(game.respect, RESPECT_POINTS.finale + ISLAND_ARC_RESPECT);
         if (fg.rankUp) game.msg += ` Rank up: ${fg.rank.name}!`;
       }
       const unlocks = ['taxi', 'van', 'coupe', 'muscle', 'convertible'];
@@ -632,13 +829,34 @@ export function createGame(rng) {
         game.msg = `Job failed: ${ev.job.def.name} — the timer ran out. Press J to try again.`;
       }
     }
+    // --- v7 island jobs: pickup, checkpoint, payout, expiry — the
+    // same shape as the city jobs, on the island grid.
+    for (const ev of [updateIslandJob(game.islandJobs, p.x, p.z, dt, game.elapsed)].filter(Boolean)) {
+      if (ev.type === 'step') {
+        game.msg = ev.job.steps[ev.index] ? ev.job.steps[ev.index].text : '';
+        if (audio) audio.chime();
+      } else if (ev.type === 'done') {
+        const mult = sideJobCashMultiplier(game.respect.points);
+        const pay = Math.round(ev.pay * mult);
+        game.cash += pay;
+        game.stats.jobsDone += 1;
+        const gained = addRespect(game.respect, ev.respect);
+        game.msg = `Island job done: ${ev.job.def.name} — earned $${pay}! +${ev.respect} respect.`;
+        if (gained.rankUp) game.msg += ` Rank up: ${gained.rank.name}!`;
+        if (audio) audio.chime();
+        autosave(game, game.saveSlots);
+      } else if (ev.type === 'failed') {
+        game.msg = `Island job failed: ${ev.job.def.name} — ${ev.reason}. Press J to try again.`;
+      }
+    }
     // --- v4 GPS: route to the mission step, or the job target when
     // no mission is active. The route recomputes as the player drives.
     {
       const step = currentStep(game.missions);
       const target = game.missions.active && step
         ? step
-        : (game.jobs.active ? jobTarget(game.jobs) : null);
+        : (game.jobs.active ? jobTarget(game.jobs)
+          : (game.islandJobs.active ? islandJobTarget(game.islandJobs) : null));
       if (target) {
         const key = `${Math.round(target.x)},${Math.round(target.z)}:${target.text || ''}`;
         if (game.gps.targetKey !== key) {
@@ -739,6 +957,19 @@ export function createGame(rng) {
     // signs over Mara's businesses and FOR SALE boards over the rest.
     boxes.push(...weatherBoxes(game.weather, time, p.x, p.z));
     boxes.push(...businessBoxes(game.business, time));
+    // v7: the ferry (always — it is visible from the pier), and the
+    // whole island when Mara is on it: the volcano, the town, the
+    // traffic, the patrol, the jobs, the businesses and the events.
+    boxes.push(...ferryBoxes(game.ferry, time));
+    boxes.push(...ferryGullBoxes(game.ferry, time));
+    if (game.island.onIsland) {
+      boxes.push(...islandBoxes(game.island, time));
+      boxes.push(...islandTrafficBoxes(game.islandTraffic, time));
+      boxes.push(...islandPoliceBoxes(game.islandPolice, time));
+      boxes.push(...islandJobBoxes(game.islandJobs, time));
+      boxes.push(...islandBusinessBoxes(game.islandBusiness, time));
+      boxes.push(...islandEventBoxes(game.islandEvents, time));
+    }
     if (game.combat.muzzle > 0) {
       const mw = game.combat.lastWeapon === 'shotgun' ? 1.1 : 0.6;
       boxes.push({ x: p.x + Math.sin(p.angle) * 1.2, y: 1.0, z: p.z + Math.cos(p.angle) * 1.2, w: mw, h: mw, d: mw, color: muzzleColor(game.combat.lastWeapon), yaw: 0 });
@@ -825,6 +1056,23 @@ export function createGame(rng) {
       businessLabel: businessSummary(game.business).owned > 0
         ? `${businessSummary(game.business).owned}/6 businesses · $${businessSummary(game.business).incomePerDay}/day`
         : 'No businesses — press B near a FOR SALE board',
+      // v7 HUD state: the island, the ferry, and the island systems.
+      island: {
+        onIsland: game.island.onIsland,
+        district: islandDistrictAt(player.x, player.z).name,
+        label: islandLabel(game.island, player.x, player.z),
+        trips: game.island.trips,
+        visits: game.island.visits,
+      },
+      ferry: {
+        side: game.ferry.side, state: game.ferry.state,
+        progress: Math.round(game.ferry.progress * 100) / 100,
+        label: ferryLabel(game.ferry, islandBusinessCount(game.islandBusiness) + (game.business ? Object.keys(game.business.owned || {}).length : 0) > 0),
+      },
+      islandBusiness: { ...islandBusinessSummary(game.islandBusiness), hint: nextIslandUpgradeHint(game.islandBusiness) },
+      islandJob: islandJobLabel(game.islandJobs),
+      islandEvent: islandEventLabel(game.islandEvents),
+      islandPolice: islandPoliceLabel(game.islandPolice, game.police.wanted),
       objective: game.missions.active && m && step ? {
         title: m.title,
         text: step.text,
@@ -838,6 +1086,17 @@ export function createGame(rng) {
   }
 
   function respawn() {
+    // v7: busted on Ember Isle wakes Mara at the Ember Dock, not the
+    // city hospital — the ferry does not carry the unconscious.
+    if (game.island.onIsland) {
+      player.x = FERRY_TERMINAL_ISLAND.x; player.z = FERRY_TERMINAL_ISLAND.z;
+      player.health = 60; player.armour = 50;
+      player.inCar = false; player.car = null;
+      game.islandPolice = createIslandPolice();
+      game.screen = SCREEN_PLAY;
+      game.msg = 'Mara wakes up at Ember Dock. The volcano is still there. So is she.';
+      return;
+    }
     const hosp = game.city.landmarks.find((l) => l.id === 'hospital');
     player.x = hosp.x; player.z = hosp.z; player.health = 60; player.armour = 50;
     player.inCar = false; player.car = null;
@@ -847,7 +1106,7 @@ export function createGame(rng) {
   }
 
   return {
-    game, player, city, coast, districts, reset, applySave, startMission, restartMission,
+    game, player, city, coast, districts, island, reset, applySave, startMission, restartMission,
     enterCar, fireWeapon, changeWeapon, step, collectBoxes, hudState, respawn,
     buyGarageUpgrade, cycleGarageUpgrade, nextRadio,
     // v4: side jobs, GPS, save slots, weapon wheel.

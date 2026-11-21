@@ -44,6 +44,14 @@ export const RADIO_STATIONS = [
     tempo: 64, root: 146.83, scale: [0, 2, 3, 5, 7, 8, 10, 12],
     mood: 'slow storm-watch minor',
   },
+  // v7: the island station — fast volcano rock from DJ Ash on the rim
+  // hut, the loudest thing on Ember Isle, and the signal crosses the
+  // water because the volcano is a very good antenna.
+  {
+    id: 'ember', name: 'EMBER 107.3', show: 'Volcano Rock',
+    tempo: 142, root: 207.65, scale: [0, 2, 3, 5, 7, 8, 10, 12],
+    mood: 'fast volcano rock',
+  },
 ];
 
 export function createRadio() {

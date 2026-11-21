@@ -20,6 +20,12 @@ import { spikesSave } from './spikestrip.js';
 import { districtsSave } from './districts.js';
 import { weatherSave } from './weather.js';
 import { businessSave } from './business.js';
+import { islandSave } from './island.js';
+import { ferrySave } from './ferry.js';
+import { islandPoliceSave } from './island-police.js';
+import { islandJobsSave } from './island-jobs.js';
+import { islandBusinessSave } from './island-business.js';
+import { islandEventsSave } from './island-events.js';
 
 export function hasSave() {
   try { return !!window.localStorage.getItem(SAVE_KEY); } catch { return false; }
@@ -51,7 +57,16 @@ export function buildSaveData(state) {
     // v6: the weather state and the business portfolio.
     weather: state.weather ? weatherSave(state.weather) : null,
     business: state.business ? businessSave(state.business) : null,
-    version: 6,
+    // v7: the island — where Mara was, the ferry side, the island
+    // police heat, jobs, businesses and events, so a save made on
+    // Ember Isle loads back on Ember Isle.
+    island: state.island ? islandSave(state.island) : null,
+    ferry: state.ferry ? ferrySave(state.ferry) : null,
+    islandPolice: state.islandPolice ? islandPoliceSave(state.islandPolice) : null,
+    islandJobs: state.islandJobs ? islandJobsSave(state.islandJobs) : null,
+    islandBusiness: state.islandBusiness ? islandBusinessSave(state.islandBusiness) : null,
+    islandEvents: state.islandEvents ? islandEventsSave(state.islandEvents) : null,
+    version: 7,
     savedAt: Date.now(),
   };
 }

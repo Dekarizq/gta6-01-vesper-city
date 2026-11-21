@@ -1,19 +1,22 @@
-// Vesper City: Golden Hour — Sunset Kings v6 — built by simedhol's recorded session:
+// Vesper City: Golden Hour — Sunset Kings v7 — built by simedhol's recorded session:
 // a raw-WebGL 3D open-world crime game (procedural golden-hour city, driving,
 // carjacking, police wanted 0-6 with named VCPD units, spike strips and the
-// CONDOR-1 helicopter, 15 story missions, 4 weapons incl. the Golden
+// CONDOR-1 helicopter, 20 story missions, 4 weapons incl. the Golden
 // 12-Gauge shotgun on a hold-Q weapon wheel, armour, building collision,
-// Sunset Garage upgrades incl. NITRO and STORM TYRES, 6 procedural radio
+// Sunset Garage upgrades incl. NITRO and STORM TYRES, 7 procedural radio
 // stations, respect ranks and crew, cars that burn and explode into smoking
 // wrecks, the Sunset Beach coast with a pier, boardwalk and boats,
 // repeatable side jobs — taxi, delivery, street race — a GPS route line,
 // and 3 save slots, plus the v5 visual overhaul: lit facades, street
 // lamps, trees, billboards, the Marina District and Old Town, denser
-// traffic with five new car models, clouds, birds and sea glints, and
-// the v6 systems: a day-night storm weather engine with lightning and a
+// traffic with five new car models, clouds, birds and sea glints, the
+// v6 systems: a day-night storm weather engine with lightning and a
 // 7-day hurricane countdown that changes traffic and wanted, a buyable
 // business empire with passive income and upgrades, and a 3-mission
-// story arc in the Marina and Old Town ending in "King of Vesper").
+// story arc in the Marina and Old Town ending in "King of Vesper", and
+// the v7 systems: Ember Isle, a volcanic second map across the ferry
+// with its own police, jobs, businesses and radio, and a 5-mission
+// island arc ending in "King of Ember".
 // A working gta6-01 entry (Node 22, standard library only): the game is this directory's
 // game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
 // modules, no library and no network request), and the program hands it in. It copies game/ and
@@ -21,7 +24,7 @@
 // judge reads, with the vendored make.fun library. The four screenshots in screenshots/ are the
 // cover (marina hero), the old-town night market, the coast chase on the pier and the title screen —
 // regenerate them with the ?shot= queries in shots.json whenever the game changes, so the
-// dossier always shows the game as it really plays now. v6 shots: storm, business, arc, start.
+// dossier always shows the game as it really plays now. v7 shots: ferry, volcano, island, start.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:

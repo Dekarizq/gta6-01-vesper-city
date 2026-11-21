@@ -18,11 +18,12 @@
 import { roadCross } from './city.js';
 import { buildExtraMissions } from './missions-extra.js';
 import { buildArcMissions } from './missions-arc.js';
+import { buildIslandMissions } from './island-missions.js';
 
 function pt(x, z, text, kind) { return { x, z, text, kind: kind || 'goto' }; }
 function cross(ix, iz, text, kind) { const p = roadCross(ix, iz); return pt(p.x, p.z, text, kind); }
 
-export function buildMissions(city, coast) {
+export function buildMissions(city, coast, island) {
   const base = [
     { id: 1, title: 'First Fare', giver: 'Dario Kess', reward: 350, respect: 120,
       intro: 'Dario: "Seven days till the storm, Mara. Drive like you mean it."',
@@ -75,7 +76,12 @@ export function buildMissions(city, coast) {
   // front. When no coast is passed (unit tests), the base 10 still
   // stand, and the arc builds on its fallback points.
   const withCoast = coast ? base.concat(buildExtraMissions(coast)) : base;
-  return withCoast.concat(buildArcMissions(city, coast));
+  const withArc = withCoast.concat(buildArcMissions(city, coast));
+  // v7: missions 16-20 live on Ember Isle — the ferry in, the volcano,
+  // the black beach, the lighthouse, and a finale that crowns Mara
+  // King of Ember. When no island is passed (unit tests), the base 15
+  // still stand, and the island arc builds on its fallback points.
+  return island ? withArc.concat(buildIslandMissions(island)) : withArc;
 }
 
 export function missionDistrict(m) {

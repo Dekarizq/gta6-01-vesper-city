@@ -1,4 +1,4 @@
-// hud.js — the DOM HUD for Sunset Kings (v6), dense like the rank 1-2
+// hud.js — the DOM HUD for Sunset Kings (v7), dense like the rank 1-2
 // entries: big cash, health + armour bars, wanted stars, four weapon
 // slots with ammo, storm countdown, district + radio, a mission card
 // with progress, a live VCPD pursuit panel with named officers and
@@ -37,6 +37,7 @@ export function createHud(city) {
     <div id="hud-coast" class="hud-panel"></div>
     <div id="hud-weather" class="hud-panel"></div>
     <div id="hud-business" class="hud-panel"></div>
+    <div id="hud-island" class="hud-panel"></div>
     <div id="hud-slots" class="hud-panel"></div>
     <div id="weapon-wheel" class="hud-panel"></div>
     <div id="hud-dialog" class="hud-panel"><div id="hud-portrait">D</div><div id="hud-dialog-text"></div></div>
@@ -51,14 +52,14 @@ export function createHud(city) {
         <div id="title-kicker">A SUN-SOAKED OPEN WORLD · GOLDEN HOUR BEFORE THE HURRICANE · SUNSET KINGS</div>
         <h1 id="title-name">VESPER CITY<br><span>GOLDEN HOUR</span><br><span class="title-kings">— SUNSET KINGS —</span></h1>
         <p id="title-story">Mara Voss, getaway driver. One week before Hurricane Ilsa drowns the city, the morning rain
-        has cleared and the whole coast is gold. Fixer Dario Kess offers her one last way out — fifteen jobs, fifteen sunsets, no way back.
+        has cleared and the whole coast is gold. Fixer Dario Kess offers her one last way out — twenty jobs, twenty sunsets, no way back.
         Build respect, gather your crew, tune your car at the Sunset Garage, buy the businesses that pay you back, hold the beach against the Tide Kings through the storm itself, and become the King of Vesper.</p>
         <div id="title-controls">WASD / Arrows — drive &amp; walk &nbsp;·&nbsp; E — steal car &nbsp;·&nbsp; F / click — shoot<br>
         1 / 2 / 3 / 4 — switch weapon &nbsp;·&nbsp; HOLD Q — weapon wheel &nbsp;·&nbsp; TAP Q — start mission &nbsp;·&nbsp; G — Sunset Garage &nbsp;·&nbsp; R — radio station<br>
         J — side job (taxi / delivery / race) &nbsp;·&nbsp; L — GPS route &nbsp;·&nbsp; K — save slot &nbsp;·&nbsp; B — buy business &nbsp;·&nbsp; Space — handbrake &nbsp;·&nbsp; Shift — sprint &nbsp;·&nbsp; T — restart mission &nbsp;·&nbsp; M — map &nbsp;·&nbsp; P — pause</div>
         <button id="start-btn">START ENGINE</button>
         <button id="continue-btn">CONTINUE SAVED GAME</button>
-        <div id="title-foot">15 story missions · 11 car types · Sunset Garage upgrades incl. NITRO &amp; CHROME · 6 radio stations · respect ranks &amp; crew · wanted 0–6 · spike strips · named VCPD units, roadblocks &amp; CONDOR-1 helicopter · cars that burn &amp; explode · Sunset Beach coast with pier, boats &amp; side jobs · Marina District &amp; Old Town · day cycle, rain &amp; lightning · 6 buyable businesses · GPS route · 3 save slots</div>
+        <div id="title-foot">20 story missions · 15 car types · Sunset Garage upgrades incl. NITRO &amp; CHROME · 7 radio stations · respect ranks &amp; crew · wanted 0–6 · spike strips · named VCPD units, roadblocks &amp; CONDOR-1 helicopter · cars that burn &amp; explode · Sunset Beach coast with pier, boats &amp; side jobs · Marina District &amp; Old Town · day cycle, rain &amp; lightning · 10 buyable businesses · GPS route · 3 save slots · ferry to Ember Isle — a volcanic island with its own police, jobs &amp; businesses</div>
       </div>
     </div>
     <div id="pause-screen"><h2>PAUSED</h2><p>WASD drive · E steal car · F shoot · 1/2/3 weapons · G garage · R radio · Q mission · T restart mission · U mute</p>
@@ -306,6 +307,16 @@ export function createHud(city) {
           + (b.list || []).map((x) => `<div class="vcpd-row"><span>${x.name}</span><span>Lv${x.level} · $${x.income}/day</span></div>`).join('')
           + (b.hint ? `<div class="vcpd-row"><span>${b.hint}</span></div>` : '');
         $('hud-business').style.display = 'block';
+      }
+      // v7: island chip — where Mara is, the ferry, and what the
+      // island is doing right now, so the second map stays on screen.
+      if (state.island) {
+        const isl = state.island;
+        const ferry = state.ferry ? state.ferry.label : '';
+        const ev = state.islandEvent ? ` · ${state.islandEvent.name} ${state.islandEvent.timeLeft}s` : '';
+        const job = state.islandJob ? ` · ${state.islandJob.name}` : '';
+        $('hud-island').textContent = `🌋 ${isl.label} · ${ferry}${ev}${job}`;
+        $('hud-island').style.display = 'block';
       }
       // v4: save-slot line — which slot is active, and what it holds.
       if (state.slots) {
