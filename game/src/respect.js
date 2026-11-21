@@ -2,11 +2,14 @@
 // doing real things, never by standing still: finishing a mission pays
 // the most, stealing a car pays a little, a Sun Coin streak pays for
 // flair, blowing up a police car pays for nerve, and v4 side jobs pay
-// for honest work on the coast. Each rank is a visible title on the
-// HUD, and the crew grows as Mara climbs: Lena Voss drives getaway,
-// Rook the mechanic cuts garage prices, Dario Kess the fixer doubles
-// Sun Coin streak bonuses, and Kai Sol — the coast driver Mara meets
-// on the pier in mission 11 — adds 15% side-job cash. Pure logic, no DOM.
+// for honest work on the coast. v6 adds respect for owning the city:
+// buying a business pays 30, and every upgrade level pays 15 more, so
+// a level-3 bar is worth real standing on the street. Each rank is a
+// visible title on the HUD, and the crew grows as Mara climbs: Lena
+// Voss drives getaway, Rook the mechanic cuts garage prices, Dario
+// Kess the fixer doubles Sun Coin streak bonuses, and Kai Sol — the
+// coast driver Mara meets on the pier in mission 11 — adds 15%
+// side-job cash. Pure logic, no DOM.
 export const RESPECT_RANKS = [
   { name: 'STREET ROOKIE', min: 0, blurb: 'Nobody on Sunset Mile knows your name yet.' },
   { name: 'SUNSET RUNNER', min: 150, blurb: 'Cabbies nod when you pass. Lena joins the crew.' },
@@ -65,6 +68,13 @@ export function nextRank(points) {
 }
 
 // Add respect and report whether a new rank (and crew member) was earned.
+// v6: respect for buying into the city. A new business pays 30; an
+// upgrade pays 15 per level the property reaches, so levelling a bar
+// from 1 to 3 pays 30 + 45 and the street notices the investment.
+export function businessRespect(level) {
+  return 30 + Math.max(0, (level || 1) - 1) * 15;
+}
+
 export function addRespect(state, pts) {
   const before = respectRankIndex(state.points);
   state.points += pts;

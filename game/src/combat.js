@@ -49,9 +49,12 @@ export function weaponDamage(weapon) {
 }
 
 // Firing-cone half-width, in world units at the target: the shotgun
-// sprays wide, the pistol and SMG stay tight.
-export function weaponSpread(weapon) {
-  return weapon.id === 'shotgun' ? 4.6 : 2.2;
+// sprays wide, the pistol and SMG stay tight. v6: heavy rain widens
+// every cone by up to 40% — wet hands, wet sights, and the storm does
+// the rest.
+export function weaponSpread(weapon, rain = 0) {
+  const base = weapon.id === 'shotgun' ? 4.6 : 2.2;
+  return base * (1 + clamp(rain, 0, 1) * 0.4);
 }
 
 // Top up ammo — the garage sells shells and SMG rounds, and side jobs
@@ -69,7 +72,7 @@ export function giveAmmo(combat, index, amount) {
 // description, { kind: 'dry' } when out of ammo, or null on cooldown.
 // Cars take 34 damage per pistol hit — three pistol hits light a
 // cruiser up; the shotgun does 60, so two shells do the same job.
-export function shoot(combat, player, peds, cops, time, cars = []) {
+export function shoot(combat, player, peds, cops, time, cars = [], rain = 0) {
   const weapon = WEAPONS[combat.weapon];
   if (combat.cooldown > 0 || time - combat.lastShot < weapon.cooldown) return null;
   if (combat.weapon > 0) {
@@ -83,7 +86,7 @@ export function shoot(combat, player, peds, cops, time, cars = []) {
   combat.lastWeapon = weapon.id;
   const fx = Math.sin(player.angle), fz = Math.cos(player.angle);
   let best = null, bestD = weapon.range;
-  const spread = weaponSpread(weapon);
+  const spread = weaponSpread(weapon, rain);
   const consider = (x, z, kind, ref) => {
     const dx = x - player.x, dz = z - player.z;
     const along = dx * fx + dz * fz;

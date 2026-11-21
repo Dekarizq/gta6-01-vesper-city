@@ -39,13 +39,15 @@ export function deployStrip(strips, x, z, angle, unit, now) {
 // traffic) against every live strip. A hit bursts the car's tyres —
 // the car keeps rolling, but slow and wobbling — and the strip is
 // spent. Returns the hit events, in order.
-export function updateStrips(strips, cars, now, dt) {
+export function updateStrips(strips, cars, now, dt, weather) {
   const events = [];
-  // Expire strips that have sat too long.
+  // Expire strips that have sat too long. v6: a storm washes them
+  // away twice as fast — the flood lifts the spikes off the road.
+  const lifetime = weather && weather.phase === 'storm' ? SPIKE_LIFETIME / 2 : SPIKE_LIFETIME;
   for (const s of strips.strips) {
-    if (!s.used && now - s.laidAt > SPIKE_LIFETIME) s.used = true;
+    if (!s.used && now - s.laidAt > lifetime) s.used = true;
   }
-  strips.strips = strips.strips.filter((s) => !s.used || now - s.laidAt < SPIKE_LIFETIME + 2);
+  strips.strips = strips.strips.filter((s) => !s.used || now - s.laidAt < lifetime + 2);
   for (const strip of strips.strips) {
     if (strip.used) continue;
     for (const car of cars) {

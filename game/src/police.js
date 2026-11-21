@@ -44,6 +44,8 @@ export function copStatus(cop, player) {
   if (unit.tactic === 'SPIKE') return 'LAYING SPIKES';
   // v5: the marina patrol (VCPD-77, Ofc. Marisol) works the quay.
   if (unit.tactic === 'MARINA') return 'MARINA PATROL';
+  // v6: the storm unit (VCPD-88, Ofc. Storm) works the flooded roads.
+  if (unit.tactic === 'STORM') return 'STORM UNIT';
   if (d < 12 && Math.abs(cop.speed) > 10) return unit.tactic === 'PIT' ? 'PIT MOVE' : 'RAMMING';
   return unit.tactic || 'PURSUIT';
 }

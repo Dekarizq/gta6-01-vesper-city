@@ -1,10 +1,14 @@
-// missions.js — the 12-mission story of the Sunset Kings (v4): Mara Voss,
+// missions.js — the 15-mission story of the Sunset Kings (v6): Mara Voss,
 // getaway driver with one week before Hurricane Ilsa drowns the city,
 // works for fixer Dario Kess to buy her way out — and along the way she
 // builds a crew and a reputation. Each mission is a chain of go-to steps;
 // finishing one pays cash and respect, and the crew bonuses stack: Lena
 // adds 10% mission cash, Rook cuts garage prices, Dario doubles streaks,
-// and Kai adds 15% side-job cash once he joins on the coast.
+// and Kai adds 15% side-job cash once he joins on the coast. Missions
+// 11-12 (missions-extra.js) take the story to the coast; missions 13-15
+// (missions-arc.js) take it through the hurricane front itself, and the
+// finale only opens for a king who owns a level-2 business and holds
+// 2,000 respect.
 // EVERY step sits on a road intersection (roadCross) or a named coast
 // point (pier, boardwalk, boat dock), so building collision can never
 // trap a target — the old (0,0) Storm Spire targets are gone. v3 mission
@@ -13,6 +17,7 @@
 // chase down the pier, and the King of the Sunset finale on the coast.
 import { roadCross } from './city.js';
 import { buildExtraMissions } from './missions-extra.js';
+import { buildArcMissions } from './missions-arc.js';
 
 function pt(x, z, text, kind) { return { x, z, text, kind: kind || 'goto' }; }
 function cross(ix, iz, text, kind) { const p = roadCross(ix, iz); return pt(p.x, p.z, text, kind); }
@@ -66,9 +71,11 @@ export function buildMissions(city, coast) {
   base.forEach((m, i) => { m.district = districts[i] || 'Vesper City'; });
   // v4: missions 11-12 live on the coast — the Tide Kings move in the
   // day after the coronation, and the story continues onto the pier.
-  // When no coast is passed (unit tests), the base 10 still stand.
-  if (coast) return base.concat(buildExtraMissions(coast));
-  return base;
+  // v6: missions 13-15 (the arc) follow them through the hurricane
+  // front. When no coast is passed (unit tests), the base 10 still
+  // stand, and the arc builds on its fallback points.
+  const withCoast = coast ? base.concat(buildExtraMissions(coast)) : base;
+  return withCoast.concat(buildArcMissions(city, coast));
 }
 
 export function missionDistrict(m) {

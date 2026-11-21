@@ -13,7 +13,13 @@
 // models, denser traffic and crowds, clouds, birds and sea glints —
 // the city finally looks as rich as the top entries' screenshots.
 // The save key is new so a v5 save never collides with a v4 save.
-export const GAME_TITLE = 'Vesper City: Golden Hour — Sunset Kings v5';
+// v6 is the authorship round: the renderer and the city generator are
+// rewritten in one recorded session, the week gets real weather (a day
+// cycle, rain, lightning, the hurricane front), Mara can buy six
+// businesses that pay daily income, and a three-mission arc (13-15)
+// crowns her King of Vesper — gated on a level-2 business and 2,000
+// respect. The save key is new so a v6 save never collides with a v5 one.
+export const GAME_TITLE = 'Vesper City: Golden Hour — Sunset Kings v6';
 export const WORLD = {
   block: 44,          // size of one city block (world units)
   blocks: 9,          // blocks across (city spans blocks*block + roads)
@@ -29,7 +35,7 @@ export const PLAYER = { walkSpeed: 7, sprintSpeed: 11, health: 100, armour: 100,
 // v4: the heat goes to 6 stars. Six stars means five cruisers, CONDOR-1,
 // a roadblock AND spike strips — the full VCPD response.
 export const WANTED_MAX = 6;
-export const SAVE_KEY = 'vesper-city-golden-hour-v5-save-v1';
+export const SAVE_KEY = 'vesper-city-golden-hour-v6-save-v1';
 export const WEAPONS = [
   { id: 'fists', name: 'FISTS', ammo: Infinity, cooldown: 0.35, range: 3 },
   { id: 'pistol', name: 'VESPER 9MM', ammo: 72, cooldown: 0.28, range: 60 },
@@ -57,6 +63,9 @@ export const CAR_TYPES = [
   { id: 'limo', name: 'Gold Limo', color: [0.12, 0.1, 0.14], top: 28, accel: 16, brake: 30, grip: 2.6, len: 6.4 },
   { id: 'hatch', name: 'City Hatch', color: [0.3, 0.55, 0.9], top: 25, accel: 18, brake: 30, grip: 2.9, len: 3.8 },
   { id: 'bus', name: 'Vesper Bus', color: [0.9, 0.6, 0.2], top: 18, accel: 10, brake: 24, grip: 2.0, len: 7.2 },
+  // v6 traffic: the Storm Chaser 4x4 — a lifted truck with a roof rack
+  // and a snorkel, built for the flooded harbour roads in the front.
+  { id: 'storm4x4', name: 'Storm Chaser', color: [0.85, 0.4, 0.15], top: 29, accel: 20, brake: 32, grip: 3.2, len: 5.2 },
 ];
 export const DISTRICTS = [
   { name: 'Sunset Mile', color: '#ff9a3d' },
@@ -81,7 +90,7 @@ export const GOLD = {
   rose: [0.72, 0.42, 0.38],
 };
 export const WINDOW_STRIP = ['#ffd166', '#7dd3fc', '#fda4af', '#fbbf24'];
-export const RADIO_STATIONS = ['VESPER 98.1 · Golden Hour Mix', 'SUNSET FM 101.5 · Coast Drive', 'STORM RADIO 87.9 · Weather Band', 'COAST 104.7 · Beach Nights', 'MARINA 99.9 · Yacht Rock'];
+export const RADIO_STATIONS = ['VESPER 98.1 · Golden Hour Mix', 'SUNSET FM 101.5 · Coast Drive', 'STORM RADIO 87.9 · Weather Band', 'COAST 104.7 · Beach Nights', 'MARINA 99.9 · Yacht Rock', 'HURRICANE 88.8 · Storm Watch'];
 // Named VCPD units: every cruiser and the helicopter have a callsign, an
 // officer, and a tactic, so the pursuit panel reads like a real dispatch.
 // v4 adds the SPIKE unit (Ofc. Duarte, lays spike strips at 4+ stars)
@@ -98,6 +107,10 @@ export const VCPD_UNITS = [
   // v5: the marina gets its own patrol — Ofc. Marisol works the quay
   // and the lighthouse road, so the new district has a police presence.
   { callsign: 'VCPD-77', officer: 'Ofc. Marisol', tactic: 'MARINA', role: 'Marina Patrol' },
+  // v6: the storm unit — Sgt. Reyes' old partner Ofc. Storm works the
+  // flooded harbour roads in the front, when the rest of the VCPD
+  // stays on the high ground.
+  { callsign: 'VCPD-88', officer: 'Ofc. Storm', tactic: 'STORM', role: 'Storm Unit' },
 ];
 export const HELI_UNIT = { callsign: 'CONDOR-1', officer: 'Capt. Hale', tactic: 'AIR SUPPORT', role: 'Helicopter' };
 // v4 coast: the pier, the boardwalk and the boat dock live south of the

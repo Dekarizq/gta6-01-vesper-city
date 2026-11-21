@@ -36,6 +36,14 @@ export const RADIO_STATIONS = [
     tempo: 88, root: 185.0, scale: [0, 2, 4, 5, 7, 9, 11, 12],
     mood: 'smooth marina glide',
   },
+  // v6: the hurricane station — a slow minor-key storm watch for the
+  // last two days, when the front is on the city and the radio is the
+  // only voice telling Mara how bad it is about to get.
+  {
+    id: 'hurricane', name: 'HURRICANE 88.8', show: 'Storm Watch',
+    tempo: 64, root: 146.83, scale: [0, 2, 3, 5, 7, 8, 10, 12],
+    mood: 'slow storm-watch minor',
+  },
 ];
 
 export function createRadio() {

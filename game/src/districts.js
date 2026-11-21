@@ -85,10 +85,13 @@ export function createDistricts(city) {
   };
 }
 
-export function stepDistricts(districts, dt) {
+export function stepDistricts(districts, dt, weather) {
   districts.time += dt;
+  // v6: the sailboats reef their sails and slow down when the storm
+  // front arrives — the sea empties before the hurricane does.
+  const sailFactor = weather && weather.phase === 'storm' ? 0.35 : 1;
   for (const b of districts.sailboats) {
-    b.x += b.speed * dt;
+    b.x += b.speed * sailFactor * dt;
     if (b.x > 260) b.x = -260;
   }
   return districts;

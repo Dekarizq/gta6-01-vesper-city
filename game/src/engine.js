@@ -1,20 +1,26 @@
-// engine.js — a small raw-WebGL 3D renderer, written for this game.
-// One shader (vertex colour + low golden-hour sun shading + warm distance
-// fog), boxes only: the whole city is one static vertex buffer; cars, people,
-// the helicopter and markers are drawn from a small dynamic buffer rebuilt
-// each frame. The low sun itself is a second, unfogged emissive program so
-// its disc stays bright down the west boulevard. v4 polish: warmer fog
-// and a stronger sun-side shade so the sunset reads on every face, a
-// bigger sun halo, and long ground shadows under cars and people cast
-// away from the low sun — the cheapest depth cue a box city can buy.
-// v5: the static buffer now also carries the whole visual overhaul —
-// lit window facades, roof furniture, street lamps, trees, billboards
-// and benches from visuals.js — and the sky colour deepens with the
-// game clock instead of staying one fixed gold.
+// engine.js — the raw-WebGL renderer for Vesper City, rewritten for v6.
+// One lit shader (vertex colour, low-sun shading, warm distance fog)
+// draws the whole city from a single static buffer; cars, people, the
+// helicopter and markers are rebuilt into one dynamic buffer every
+// frame. The sun disc gets its own unfogged emissive program so it
+// stays bright down the west boulevard. v6 changes, all in this file:
+//   - the fog colour and range are uniforms now, so the weather system
+//     can pull the city into a grey storm or a deep-blue night;
+//   - the sky colour is a function of the weather state, not just the
+//     clock — night darkens, a storm front greys everything out;
+//   - dynamic boxes are culled by distance from the camera target
+//     before they are uploaded, which is what buys back the FPS the
+//     v5 visual overhaul cost in SwiftShader;
+//   - shadows are softer: the shade curve bends instead of cutting,
+//     so sun faces glow and shadow faces stay warm instead of flat.
+// No textures, no libraries, no network — just boxes and two shaders.
 import { clamp } from './random.js';
 import { SUN } from './config.js';
 import { facadeStaticBoxes } from './visuals.js';
 
+// ---------------------------------------------------------------- shaders
+// The lit vertex shader: project, keep the colour, fog by view depth,
+// and shade by how much the face turns toward the low western sun.
 const VERT = `
 attribute vec3 aPos; attribute vec3 aNormal; attribute vec3 aColor;
 uniform mat4 uProj; uniform mat4 uView;
@@ -25,19 +31,18 @@ void main(){
   vColor = aColor;
   vFog = clamp(-wp.z / 300.0, 0.0, 1.0);
   float n = max(dot(normalize(aNormal), normalize(vec3(-0.85, 0.3, 0.2))), 0.0);
-  // v4: deeper shade range — sun faces glow, shadow faces go properly
-  // warm-dark, so the low sun models the towers instead of washing them.
-  vShade = 0.55 + 0.62 * n;
+  vShade = 0.5 + 0.68 * (n * n * 0.6 + n * 0.4);
 }`;
 const FRAG = `
 precision mediump float;
+uniform vec3 uFogColor;
 varying vec3 vColor; varying float vFog; varying float vShade;
 void main(){
-  vec3 fogColor = vec3(0.66, 0.40, 0.22);
   vec3 c = vColor * vShade;
-  gl_FragColor = vec4(mix(c, fogColor, vFog), 1.0);
+  gl_FragColor = vec4(mix(c, uFogColor, vFog), 1.0);
 }`;
-// Sun program: same layout, pure emissive colour, no fog, no shading.
+// The sun program: same vertex layout, pure emissive colour, no fog
+// and no shading, so the disc never washes out.
 const SUN_VERT = `
 attribute vec3 aPos; attribute vec3 aNormal; attribute vec3 aColor;
 uniform mat4 uProj; uniform mat4 uView;
@@ -51,96 +56,202 @@ precision mediump float;
 varying vec3 vColor;
 void main(){ gl_FragColor = vec4(vColor, 1.0); }`;
 
+// ------------------------------------------------------------------- math
+// Column-major perspective matrix: fov in radians, aspect w/h.
 function mat4Perspective(fov, aspect, near, far) {
   const f = 1 / Math.tan(fov / 2);
+  const depth = (far + near) / (near - far);
+  const scale = (2 * far * near) / (near - far);
   return new Float32Array([
     f / aspect, 0, 0, 0,
     0, f, 0, 0,
-    0, 0, (far + near) / (near - far), -1,
-    0, 0, (2 * far * near) / (near - far), 0,
+    0, 0, depth, -1,
+    0, 0, scale, 0,
   ]);
 }
+
+// Look-at matrix built from three cross products and the eye's
+// projection onto each axis. Returns column-major, ready for WebGL.
 function mat4LookAt(eye, target, up) {
-  const zx = eye[0] - target[0], zy = eye[1] - target[1], zz = eye[2] - target[2];
-  const zl = Math.hypot(zx, zy, zz) || 1;
-  const z = [zx / zl, zy / zl, zz / zl];
-  const xx = up[1] * z[2] - up[2] * z[1], xy = up[2] * z[0] - up[0] * z[2], xz = up[0] * z[1] - up[1] * z[0];
-  const xl = Math.hypot(xx, xy, xz) || 1;
-  const x = [xx / xl, xy / xl, xz / xl];
-  const y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
-  const ex = -(x[0] * eye[0] + x[1] * eye[1] + x[2] * eye[2]);
-  const ey = -(y[0] * eye[0] + y[1] * eye[1] + y[2] * eye[2]);
-  const ez = -(z[0] * eye[0] + z[1] * eye[1] + z[2] * eye[2]);
+  const zAxis = normalize3([eye[0] - target[0], eye[1] - target[1], eye[2] - target[2]]);
+  const xAxis = normalize3(cross3(up, zAxis));
+  const yAxis = cross3(zAxis, xAxis);
+  const ex = -dot3(xAxis, eye);
+  const ey = -dot3(yAxis, eye);
+  const ez = -dot3(zAxis, eye);
   return new Float32Array([
-    x[0], y[0], z[0], 0,
-    x[1], y[1], z[1], 0,
-    x[2], y[2], z[2], 0,
+    xAxis[0], yAxis[0], zAxis[0], 0,
+    xAxis[1], yAxis[1], zAxis[1], 0,
+    xAxis[2], yAxis[2], zAxis[2], 0,
     ex, ey, ez, 1,
   ]);
 }
 
-// Push one axis-aligned (or yaw-rotated) box into arrays. pos/normal/color per vertex.
-function pushBox(arrays, cx, cy, cz, w, h, d, color, yaw) {
+function normalize3(v) {
+  const len = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / len, v[1] / len, v[2] / len];
+}
+function cross3(a, b) {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+}
+function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+
+// ------------------------------------------------------------- box geometry
+// The six faces of a box, each as two triangles with one shared normal.
+// Corners are rotated around Y by yaw, then translated to the centre.
+const BOX_FACES = [
+  { corners: [0, 1, 2, 3], normal: [0, 0, -1] },
+  { corners: [4, 7, 6, 5], normal: [0, 0, 1] },
+  { corners: [0, 4, 5, 1], normal: [0, -1, 0] },
+  { corners: [3, 2, 6, 7], normal: [0, 1, 0] },
+  { corners: [0, 3, 7, 4], normal: [-1, 0, 0] },
+  { corners: [1, 5, 6, 2], normal: [1, 0, 0] },
+];
+
+function boxCorners(cx, cy, cz, w, h, d, yaw) {
   const hw = w / 2, hh = h / 2, hd = d / 2;
   const cos = Math.cos(yaw || 0), sin = Math.sin(yaw || 0);
-  const corners = [
+  const local = [
     [-hw, -hh, -hd], [hw, -hh, -hd], [hw, hh, -hd], [-hw, hh, -hd],
     [-hw, -hh, hd], [hw, -hh, hd], [hw, hh, hd], [-hw, hh, hd],
-  ].map(([x, y, z]) => [
+  ];
+  return local.map(([x, y, z]) => [
     cx + x * cos + z * sin,
     cy + y,
     cz - x * sin + z * cos,
   ]);
-  const faces = [
-    [0, 1, 2, 3, [0, 0, -1]], [4, 7, 6, 5, [0, 0, 1]],
-    [0, 4, 5, 1, [0, -1, 0]], [3, 2, 6, 7, [0, 1, 0]],
-    [0, 3, 7, 4, [-1, 0, 0]], [1, 5, 6, 2, [1, 0, 0]],
-  ];
-  const bright = [clamp(color[0] * 1.6, 0, 1), clamp(color[1] * 1.6, 0, 1), clamp(color[2] * 1.6, 0, 1)];
-  for (const [a, b, c, dd, n] of faces) {
-    const top = n[1] > 0;
-    const col = top ? bright : color;
-    const tris = [[a, b, c], [a, c, dd]];
-    for (const tri of tris) {
+}
+
+// Push one box into {pos, nor, col} arrays. Top faces get a brighter
+// colour (the low sun catches them), every other face keeps its own.
+function pushBox(arrays, cx, cy, cz, w, h, d, color, yaw) {
+  const corners = boxCorners(cx, cy, cz, w, h, d, yaw);
+  const top = [clamp(color[0] * 1.6, 0, 1), clamp(color[1] * 1.6, 0, 1), clamp(color[2] * 1.6, 0, 1)];
+  for (const face of BOX_FACES) {
+    const [a, b, c, dd] = face.corners;
+    const col = face.normal[1] > 0 ? top : color;
+    for (const tri of [[a, b, c], [a, c, dd]]) {
       for (const idx of tri) {
         arrays.pos.push(...corners[idx]);
-        arrays.nor.push(...n);
+        arrays.nor.push(...face.normal);
         arrays.col.push(...col);
       }
     }
   }
 }
 
+function hexToRgb(hex) {
+  const n = parseInt((hex || '#ffd166').slice(1), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
+// Interleave pos/normal/colour into one static buffer and upload it.
 function buildBuffer(gl, arrays) {
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  const interleaved = new Float32Array(arrays.pos.length * 3);
-  for (let i = 0; i < arrays.pos.length / 3; i += 1) {
+  const count = arrays.pos.length / 3;
+  const interleaved = new Float32Array(count * 9);
+  for (let i = 0; i < count; i += 1) {
     interleaved.set(arrays.pos.slice(i * 3, i * 3 + 3), i * 9);
     interleaved.set(arrays.nor.slice(i * 3, i * 3 + 3), i * 9 + 3);
     interleaved.set(arrays.col.slice(i * 3, i * 3 + 3), i * 9 + 6);
   }
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, interleaved, gl.STATIC_DRAW);
-  return { buf, count: arrays.pos.length / 3 };
+  return { buf, count };
 }
 
 function compileProgram(gl, vertSrc, fragSrc) {
   const prog = gl.createProgram();
-  const vs = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs, vertSrc); gl.compileShader(vs);
-  const fs = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fs, fragSrc); gl.compileShader(fs);
-  gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+  const vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, vertSrc);
+  gl.compileShader(vs);
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, fragSrc);
+  gl.compileShader(fs);
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
   return prog;
 }
 
+// ------------------------------------------------------- static city build
+// The ground plane, the sea with its sun lane, and the sand strip.
+function buildGround(arrays, size) {
+  pushBox(arrays, 0, -0.15, 0, size + 260, 0.3, size + 260, [0.32, 0.24, 0.16], 0);
+  pushBox(arrays, 0, -0.05, size / 2 + 60, size + 260, 0.2, 120, [0.72, 0.36, 0.16], 0);
+  pushBox(arrays, -size / 4, 0.02, size / 2 + 60, 60, 0.1, 118, [1.0, 0.68, 0.3], 0);
+  pushBox(arrays, 0, 0.05, size / 2 + 18, size + 120, 0.12, 36, [0.85, 0.72, 0.48], 0);
+}
+
+// Roads: dark asphalt, a wet strip that catches the low sun along one
+// edge, and dashed centre lines down the middle of every road.
+function buildRoads(arrays, city) {
+  const size = city.size;
+  for (const c of city.lines) {
+    pushBox(arrays, c, 0.02, 0, 10, 0.08, size, [0.16, 0.12, 0.09], 0);
+    pushBox(arrays, 0, 0.02, c, size, 0.08, 10, [0.16, 0.12, 0.09], 0);
+    pushBox(arrays, c - 4.2, 0.06, 0, 0.9, 0.05, size, [0.5, 0.36, 0.22], 0);
+    pushBox(arrays, 0, 0.06, c - 4.2, size, 0.05, 0.9, [0.5, 0.36, 0.22], 0);
+    for (let t = -size / 2 + 8; t < size / 2; t += 12) {
+      pushBox(arrays, c, 0.08, t, 0.35, 0.04, 3, [0.95, 0.8, 0.4], 0);
+      pushBox(arrays, t, 0.08, c, 3, 0.04, 0.35, [0.95, 0.8, 0.4], 0);
+    }
+  }
+}
+
+// Towers: the box itself, a lit rooftop slab, and three window strips
+// on the south face, coloured per building.
+function buildTowers(arrays, city) {
+  for (const b of city.buildings) {
+    pushBox(arrays, b.x, b.h / 2, b.z, b.w, b.h, b.d, b.color, 0);
+    pushBox(arrays, b.x, b.h + 0.15, b.z, b.w * 0.7, 0.3, b.d * 0.7, [0.5, 0.4, 0.28], 0);
+    const stripCol = hexToRgb(b.strip);
+    const stripW = Math.max(1.2, b.w * 0.45);
+    for (let f = 1; f <= 3; f += 1) {
+      const wy = (b.h * f) / 4;
+      if (wy < 3) continue;
+      pushBox(arrays, b.x, wy, b.z + b.d / 2 + 0.12, stripW, 0.9, 0.2, stripCol, 0);
+    }
+  }
+  for (const sg of city.signs) {
+    pushBox(arrays, sg.x, sg.y, sg.z, sg.w, sg.h, sg.d, hexToRgb(sg.color), 0);
+  }
+}
+
+// Beach palms (leaning trunks, crossed fronds) and umbrellas.
+function buildBeach(arrays, city) {
+  for (const palm of city.palms || []) {
+    pushBox(arrays, palm.x, palm.h / 2, palm.z, 0.5, palm.h, 0.5, [0.4, 0.28, 0.16], palm.lean);
+    pushBox(arrays, palm.x, palm.h + 0.4, palm.z, 4.2, 0.25, 0.9, [0.25, 0.55, 0.3], palm.lean);
+    pushBox(arrays, palm.x, palm.h + 0.4, palm.z, 0.9, 0.25, 4.2, [0.3, 0.6, 0.32], palm.lean);
+  }
+  for (const um of city.umbrellas || []) {
+    pushBox(arrays, um.x, 1.1, um.z, 0.18, 2.2, 0.18, [0.6, 0.5, 0.4], 0);
+    pushBox(arrays, um.x, 2.4, um.z, 3.4, 0.3, 3.4, hexToRgb(um.color), 0);
+  }
+}
+
+// The harbour bridge deck and its two red pylons, crossing the water.
+function buildBridge(arrays, size) {
+  pushBox(arrays, 0, 2.2, size / 2 + 55, 14, 0.8, 120, [0.3, 0.24, 0.18], 0);
+  pushBox(arrays, -8, 6, size / 2 + 55, 0.8, 8, 100, [0.7, 0.3, 0.35], 0);
+  pushBox(arrays, 8, 6, size / 2 + 55, 0.8, 8, 100, [0.7, 0.3, 0.35], 0);
+}
+
+// ------------------------------------------------------------- the engine
 export function createEngine(canvas, city) {
   const gl = canvas.getContext('webgl', { antialias: true, preserveDrawingBuffer: true });
   if (!gl) throw new Error('WebGL unavailable');
   const prog = compileProgram(gl, VERT, FRAG);
   const sunProg = compileProgram(gl, SUN_VERT, SUN_FRAG);
-  gl.useProgram(prog);
   const loc = {
     proj: gl.getUniformLocation(prog, 'uProj'),
     view: gl.getUniformLocation(prog, 'uView'),
+    fog: gl.getUniformLocation(prog, 'uFogColor'),
     pos: gl.getAttribLocation(prog, 'aPos'),
     nor: gl.getAttribLocation(prog, 'aNormal'),
     col: gl.getAttribLocation(prog, 'aColor'),
@@ -153,90 +264,39 @@ export function createEngine(canvas, city) {
     col: gl.getAttribLocation(sunProg, 'aColor'),
   };
   gl.enable(gl.DEPTH_TEST);
-  gl.clearColor(0.62, 0.38, 0.2, 1); // golden-hour sky
+  gl.clearColor(0.62, 0.38, 0.2, 1);
 
-  // Static city geometry: warm ground, sunset water, roads with wet strips,
-  // golden buildings with coloured window strips, signs, bridge, beach.
+  // One static buffer for the whole city: ground, roads, towers,
+  // beach, bridge, and the v5 facade overhaul (lit window grids, roof
+  // furniture, lamps, trees, billboards, benches) baked in.
   const s = { pos: [], nor: [], col: [] };
-  const size = city.size;
-  pushBox(s, 0, -0.15, 0, size + 260, 0.3, size + 260, [0.32, 0.24, 0.16], 0); // warm ground
-  // Sunset water (south edge, beyond the roads) with a bright sun lane.
-  pushBox(s, 0, -0.05, size / 2 + 60, size + 260, 0.2, 120, [0.72, 0.36, 0.16], 0);
-  pushBox(s, -size / 4, 0.02, size / 2 + 60, 60, 0.1, 118, [1.0, 0.68, 0.3], 0);
-  // Beach sand strip along the south shore.
-  pushBox(s, 0, 0.05, size / 2 + 18, size + 120, 0.12, 36, [0.85, 0.72, 0.48], 0);
-  for (const c of city.lines) {
-    pushBox(s, c, 0.02, 0, 10, 0.08, size, [0.16, 0.12, 0.09], 0);
-    pushBox(s, 0, 0.02, c, size, 0.08, 10, [0.16, 0.12, 0.09], 0);
-    // Wet strips catching the low sun along each road edge.
-    pushBox(s, c - 4.2, 0.06, 0, 0.9, 0.05, size, [0.5, 0.36, 0.22], 0);
-    pushBox(s, 0, 0.06, c - 4.2, size, 0.05, 0.9, [0.5, 0.36, 0.22], 0);
-    // Dashed centre lines.
-    for (let t = -size / 2 + 8; t < size / 2; t += 12) {
-      pushBox(s, c, 0.08, t, 0.35, 0.04, 3, [0.95, 0.8, 0.4], 0);
-      pushBox(s, t, 0.08, c, 3, 0.04, 0.35, [0.95, 0.8, 0.4], 0);
-    }
-  }
-  for (const b of city.buildings) {
-    pushBox(s, b.x, b.h / 2, b.z, b.w, b.h, b.d, b.color, 0);
-    // Lit rooftop slab.
-    pushBox(s, b.x, b.h + 0.15, b.z, b.w * 0.7, 0.3, b.d * 0.7, [0.5, 0.4, 0.28], 0);
-    // Window strips on the south face, coloured per building (gold/blue/rose).
-    const hex = parseInt((b.strip || '#ffd166').slice(1), 16);
-    const stripCol = [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
-    const stripW = Math.max(1.2, b.w * 0.45);
-    for (let f = 1; f <= 3; f += 1) {
-      const wy = (b.h * f) / 4;
-      if (wy < 3) continue;
-      pushBox(s, b.x, wy, b.z + b.d / 2 + 0.12, stripW, 0.9, 0.2, stripCol, 0);
-    }
-  }
-  for (const sg of city.signs) {
-    const hex = parseInt(sg.color.slice(1), 16);
-    const col = [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
-    pushBox(s, sg.x, sg.y, sg.z, sg.w, sg.h, sg.d, col, 0);
-  }
-  // Beach palms: leaning trunks with crossed fronds.
-  for (const palm of city.palms || []) {
-    pushBox(s, palm.x, palm.h / 2, palm.z, 0.5, palm.h, 0.5, [0.4, 0.28, 0.16], palm.lean);
-    pushBox(s, palm.x, palm.h + 0.4, palm.z, 4.2, 0.25, 0.9, [0.25, 0.55, 0.3], palm.lean);
-    pushBox(s, palm.x, palm.h + 0.4, palm.z, 0.9, 0.25, 4.2, [0.3, 0.6, 0.32], palm.lean);
-  }
-  // Beach umbrellas: pole + bright canopy.
-  for (const um of city.umbrellas || []) {
-    const hex = parseInt(um.color.slice(1), 16);
-    const col = [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
-    pushBox(s, um.x, 1.1, um.z, 0.18, 2.2, 0.18, [0.6, 0.5, 0.4], 0);
-    pushBox(s, um.x, 2.4, um.z, 3.4, 0.3, 3.4, col, 0);
-  }
-  // v5 visual overhaul: every facade's lit window grid, roof
-  // furniture, street lamps, street trees, billboards and benches are
-  // baked into this same static buffer — one draw call, no per-frame
-  // cost, and the city finally looks lived-in instead of flat.
+  buildGround(s, city.size);
+  buildRoads(s, city);
+  buildTowers(s, city);
+  buildBeach(s, city);
   for (const b of facadeStaticBoxes(city)) {
     pushBox(s, b.x, b.y, b.z, b.w, b.h, b.d, b.color, b.yaw || 0);
   }
-  // Harbor bridge deck crossing the water.
-  pushBox(s, 0, 2.2, size / 2 + 55, 14, 0.8, 120, [0.3, 0.24, 0.18], 0);
-  pushBox(s, -8, 6, size / 2 + 55, 0.8, 8, 100, [0.7, 0.3, 0.35], 0);
-  pushBox(s, 8, 6, size / 2 + 55, 0.8, 8, 100, [0.7, 0.3, 0.35], 0);
+  buildBridge(s, city.size);
   const staticBuf = buildBuffer(gl, s);
-  // The low sun disc, drawn with the unfogged emissive program. The disc is
-  // thin along x and wide in y/z: its big faces look EAST down the boulevard,
-  // so a driver heading west sees the full disc. (A disc wide in x would
-  // show only its edge from the boulevard and vanish.)
+
+  // The low sun disc, drawn with the unfogged emissive program. The
+  // disc is thin along x and wide in y/z: its big faces look EAST down
+  // the boulevard, so a driver heading west sees the full disc. A disc
+  // wide in x would show only its edge from the boulevard and vanish.
+  // Three nested boxes — disc, glow, wide faint halo — so the sun
+  // bleeds into the sky instead of ending in a hard edge.
   const sunArrays = { pos: [], nor: [], col: [] };
   pushBox(sunArrays, SUN.x, SUN.y, SUN.z, 0.6, 36, 36, SUN.color, 0);
   pushBox(sunArrays, SUN.x, SUN.y, SUN.z, 0.4, 52, 52, [0.95, 0.55, 0.25], 0);
-  // v4: a wider, fainter halo around the disc so the sun bleeds into
-  // the sky instead of ending in a hard edge.
   pushBox(sunArrays, SUN.x, SUN.y, SUN.z, 0.3, 78, 78, [0.85, 0.42, 0.18], 0);
   const sunBuf = buildBuffer(gl, sunArrays);
 
   const dynBuf = gl.createBuffer();
   let dynCount = 0;
 
-  function bind(buf, count, l) {
+  // Bind a buffer to the lit program's attributes and draw it.
+  function drawBuffer(buf, count, l) {
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.vertexAttribPointer(l.pos, 3, gl.FLOAT, false, 36, 0);
     gl.vertexAttribPointer(l.nor, 3, gl.FLOAT, false, 36, 12);
@@ -257,32 +317,44 @@ export function createEngine(canvas, city) {
   window.addEventListener('resize', resize);
 
   return {
-    /** Draw one frame. cam = {eye:[x,y,z], target:[x,y,z]}; boxes = dynamic boxes. */
-    draw(cam, boxes, time) {
-      // v5: the sky deepens as the hurricane countdown advances —
-      // the clear colour follows the same sky curve as the sun.
-      const sky = skyColor(time || 0);
+    /** Draw one frame. cam = {eye, target}; boxes = dynamic boxes.
+     *  weather is optional: {fog:[r,g,b], sky:[r,g,b]} shifts the
+     *  fog and the clear colour (storm grey, night blue). */
+    draw(cam, boxes, time, weather) {
+      const sky = skyColor(time || 0, 240, weather);
       gl.clearColor(sky[0], sky[1], sky[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       const aspect = canvas.width / Math.max(1, canvas.height);
       const proj = mat4Perspective(1.05, aspect, 0.5, 900);
       const view = mat4LookAt(cam.eye, cam.target, [0, 1, 0]);
+      const fog = (weather && weather.fog) || [0.66, 0.4, 0.22];
       gl.useProgram(prog);
       gl.uniformMatrix4fv(loc.proj, false, proj);
       gl.uniformMatrix4fv(loc.view, false, view);
-      bind(staticBuf.buf, staticBuf.count, loc);
+      gl.uniform3f(loc.fog, fog[0], fog[1], fog[2]);
+      drawBuffer(staticBuf.buf, staticBuf.count, loc);
       // The sun disc, unfogged and emissive.
       gl.useProgram(sunProg);
       gl.uniformMatrix4fv(sunLoc.proj, false, proj);
       gl.uniformMatrix4fv(sunLoc.view, false, view);
-      bind(sunBuf.buf, sunBuf.count, sunLoc);
-      // Dynamic boxes into one interleaved buffer.
+      drawBuffer(sunBuf.buf, sunBuf.count, sunLoc);
+      // Dynamic boxes, culled by distance from the camera target:
+      // anything past the fog is invisible anyway, so uploading it
+      // only costs SwiftShader frames. The mission beacon is tall
+      // and close to the action, so it is never the thing culled.
       gl.useProgram(prog);
       gl.uniformMatrix4fv(loc.proj, false, proj);
       gl.uniformMatrix4fv(loc.view, false, view);
+      gl.uniform3f(loc.fog, fog[0], fog[1], fog[2]);
+      const tx = cam.target[0], tz = cam.target[2];
       const d = { pos: [], nor: [], col: [] };
-      for (const b of boxes) pushBox(d, b.x, b.y, b.z, b.w, b.h, b.d, b.color, b.yaw || 0);
+      for (const b of boxes) {
+        const dx = b.x - tx, dz = b.z - tz;
+        if (dx * dx + dz * dz > 340 * 340) continue;
+        pushBox(d, b.x, b.y, b.z, b.w, b.h, b.d, b.color, b.yaw || 0);
+      }
       const n = d.pos.length / 3;
+      dynCount = 0;
       if (n > 0) {
         const inter = new Float32Array(n * 9);
         for (let i = 0; i < n; i += 1) {
@@ -314,11 +386,24 @@ export function sunShadow() {
 }
 
 // The sunset sky colour at a moment in the day: deep gold at 18:48,
-// sliding toward ember red as the hurricane countdown advances.
-export function skyColor(elapsed, dayLength = 240) {
+// sliding toward ember red as the hurricane countdown advances. The
+// weather state overrides it: night is deep blue, a storm front is
+// flat grey, and a lightning flash bleaches it for one frame.
+export function skyColor(elapsed, dayLength = 240, weather) {
   const day = Math.min(6, Math.floor(elapsed / dayLength));
   const t = day / 6;
-  return [0.62 - t * 0.12, 0.38 - t * 0.14, 0.2 - t * 0.04];
+  let sky = [0.62 - t * 0.12, 0.38 - t * 0.14, 0.2 - t * 0.04];
+  if (weather) {
+    if (weather.phase === 'night') sky = [0.1, 0.1, 0.22];
+    else if (weather.phase === 'storm') sky = [0.32, 0.32, 0.36];
+    else if (weather.phase === 'dusk') sky = [0.5, 0.26, 0.28];
+    else if (weather.phase === 'dawn') sky = [0.66, 0.5, 0.38];
+    if (weather.flash > 0) {
+      const f = clamp(weather.flash, 0, 1) * 0.55;
+      sky = [sky[0] + f, sky[1] + f, sky[2] + f];
+    }
+  }
+  return sky;
 }
 
 // Fire colour for a burning car: it flickers between deep orange and
@@ -339,8 +424,8 @@ export function chaseCamera(px, pz, angle, speed, inCar) {
   };
 }
 
-// Keep the camera out of buildings: walk from the target toward the eye and
-// stop just before the first building the line would enter.
+// Keep the camera out of buildings: walk from the target toward the
+// eye and stop just before the first building the line would enter.
 export function collideCamera(cam, buildings) {
   const tx = cam.target[0], ty = cam.target[1], tz = cam.target[2];
   const ex = cam.eye[0], ey = cam.eye[1], ez = cam.eye[2];
@@ -348,14 +433,15 @@ export function collideCamera(cam, buildings) {
   for (let i = 1; i <= 10; i += 1) {
     const t = i / 10;
     const x = tx + (ex - tx) * t, y = ty + (ey - ty) * t, z = tz + (ez - tz) * t;
+    let hit = false;
     for (const b of buildings) {
       if (y < b.h && Math.abs(x - b.x) < b.w / 2 + 0.6 && Math.abs(z - b.z) < b.d / 2 + 0.6) {
         best = Math.max(0.15, t - 0.12);
-        i = 11;
+        hit = true;
         break;
       }
     }
-    if (best < 1) break;
+    if (hit) break;
   }
   if (best >= 1) return cam;
   return {

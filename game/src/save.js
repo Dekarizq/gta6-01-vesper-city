@@ -1,12 +1,14 @@
-// save.js — localStorage save/load for Sunset Kings (v4): cash, health,
+// save.js — localStorage save/load for Sunset Kings (v6): cash, health,
 // armour, weapon loadout, position, mission progress, wanted level, the
 // garage (cars owned + upgrade levels), the radio station, respect
 // points and crew, Sun Coin progress — and new in v4: the weapon wheel
 // pick, the coast state, side-job totals, the GPS setting, and the
-// active save slot. The key is the v4 key, so a Golden Hour v3 save can
-// never be mistaken for a v4 save. buildSaveData() is shared with the
-// three save slots (saveslots.js), so a slot and the main save are the
-// same shape and load through the same code.
+// active save slot; new in v6: the weather state and the business
+// portfolio, so a storm and a shop never vanish between sessions. The
+// key is the v6 key, so a Golden Hour v5 save can never be mistaken for
+// a v6 save. buildSaveData() is shared with the three save slots
+// (saveslots.js), so a slot and the main save are the same shape and
+// load through the same code.
 import { SAVE_KEY } from './config.js';
 import { garageSave } from './garage.js';
 import { respectSave } from './respect.js';
@@ -16,6 +18,8 @@ import { gpsSave } from './gps.js';
 import { wheelSave } from './weapon-wheel.js';
 import { spikesSave } from './spikestrip.js';
 import { districtsSave } from './districts.js';
+import { weatherSave } from './weather.js';
+import { businessSave } from './business.js';
 
 export function hasSave() {
   try { return !!window.localStorage.getItem(SAVE_KEY); } catch { return false; }
@@ -44,7 +48,10 @@ export function buildSaveData(state) {
     // v5: the districts' clock (lighthouse beam, sailboats) and the
     // save format version, so a v4 save is never mistaken for a v5 one.
     districts: state.districts ? districtsSave(state.districts) : null,
-    version: 5,
+    // v6: the weather state and the business portfolio.
+    weather: state.weather ? weatherSave(state.weather) : null,
+    business: state.business ? businessSave(state.business) : null,
+    version: 6,
     savedAt: Date.now(),
   };
 }

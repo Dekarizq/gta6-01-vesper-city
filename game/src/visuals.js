@@ -206,11 +206,21 @@ export function seaGlintBoxes(coast, time) {
 }
 
 // All dynamic visual boxes for one frame: clouds, birds, sea glints.
+// v6: the hurricane prep is visible too — dark storm-drain grates on
+// the harbour roads and tan sandbag stacks guarding the garage yard
+// and the docks, drawn from the city's own fixed coordinates.
 export function visualsBoxes(game, time) {
   const out = [];
   out.push(...cloudBoxes(time));
   out.push(...birdBoxes(time));
   out.push(...seaGlintBoxes(game.coast, time));
+  for (const d of (game.city && game.city.drains) || []) {
+    out.push({ x: d.x, y: 0.1, z: d.z, w: 2.2, h: 0.12, d: 1.2, color: [0.12, 0.12, 0.14], yaw: 0 });
+  }
+  for (const s of (game.city && game.city.sandbags) || []) {
+    out.push({ x: s.x, y: 0.5, z: s.z, w: 3.2, h: 0.9, d: 1.4, color: [0.72, 0.62, 0.42], yaw: 0 });
+    out.push({ x: s.x, y: 1.2, z: s.z, w: 2.4, h: 0.7, d: 1.1, color: [0.78, 0.68, 0.48], yaw: 0 });
+  }
   return out;
 }
 

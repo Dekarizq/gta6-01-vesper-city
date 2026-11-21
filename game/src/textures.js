@@ -25,6 +25,19 @@ export function shadeRgb(rgb, f) {
   return [Math.min(1, rgb[0] * f), Math.min(1, rgb[1] * f), Math.min(1, rgb[2] * f)];
 }
 
+// v6: the storm tint — pull any colour toward flat storm grey by t
+// (0 keeps the colour, 1 is fully grey). The engine mixes facades and
+// fog toward this when the front arrives, so the whole city greys out
+// together instead of one building at a time.
+export function stormTint(rgb, t) {
+  const grey = (rgb[0] + rgb[1] + rgb[2]) / 3;
+  return [
+    rgb[0] + (grey - rgb[0]) * t,
+    rgb[1] + (grey - rgb[1]) * t,
+    rgb[2] + (grey - rgb[2]) * t,
+  ];
+}
+
 export function mixRgb(a, b, t) {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }

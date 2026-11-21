@@ -83,6 +83,13 @@ export function gpsSetTarget(gps, target) {
   return gps;
 }
 
+// Route to a business by its id: the GPS target is the property's
+// own spot, labelled with its name, so buying a shop is a drive away.
+export function gpsSetBusinessTarget(gps, business) {
+  if (!business || !business.name) return gps;
+  return gpsSetTarget(gps, { x: business.x, z: business.z, text: business.name });
+}
+
 export function gpsUpdate(gps, px, pz, dt) {
   if (!gps.enabled || !gps.target) { gps.route = []; return gps; }
   gps.recomputeIn -= dt;

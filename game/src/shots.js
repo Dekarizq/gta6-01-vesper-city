@@ -1,5 +1,5 @@
-// shots.js — deterministic screenshot scenes for Sunset Kings (v5) behind
-// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown. Each stages the real game
+// shots.js — deterministic screenshot scenes for Sunset Kings (v6) behind
+// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown|storm|business|arc. Each stages the real game
 // state and then FREEZES it (game.frozen): the main loop draws the staged
 // frame but the world does not advance, so the car, the cops, the
 // helicopter and the burning wreck stay exactly where they were placed.
@@ -13,6 +13,12 @@
 // station and the garage panel. v5 adds the marina hero (Sunset Viper
 // on the quay, yachts and the lighthouse behind) and the old-town
 // night market (Mara on foot among the stalls, church tower behind).
+// v6 adds the storm hero (a wanted-5 chase in the hurricane front,
+// lightning in the sky, wet roads), the business hero (Mara on the
+// marina quay in front of the fish market she just bought, its gold
+// sign and level pips overhead, mission 13 active), and the arc hero
+// (the King of Vesper finale, mission 15, at dusk in the Storm Chaser
+// with the level-2 fish market behind her).
 import { SCREEN_PLAY } from './world.js';
 import { addWanted } from './police.js';
 import { makeCar } from './vehicles.js';
@@ -21,6 +27,8 @@ import { addRespect } from './respect.js';
 import { deployStrip } from './spikestrip.js';
 import { currentStep } from './missions.js';
 import { gpsSetTarget, gpsUpdate } from './gps.js';
+import { forceWeather } from './weather.js';
+import { buyBusiness as buyBiz, upgradeBusiness as upgradeBiz } from './business.js';
 
 // Staged shots are frozen, so the world loop never runs to build the
 // GPS route — pre-compute it here, or every shot's HUD chip reads
@@ -149,6 +157,80 @@ export function stageShot(name, api) {
     stageGps(api);
     game.msg = null;
     game.cash = 18700;
+    return;
+  }
+  if (name === 'storm') {
+    // v6 hero: a wanted-5 chase in the hurricane front. The weather is
+    // forced to storm (grey sky, heavy rain, lightning), Mara drives
+    // the Storm King muscle car WEST down the z=27 boulevard into the
+    // rain, four named cruisers behind her, CONDOR-1 low overhead with
+    // its searchlight, a spike strip across the road, and a smoking
+    // wreck on the roadside. The storm clouds are the picture.
+    forceWeather(game.weather, 'storm');
+    const car = makeCar({ id: 'muscle', name: 'Storm King', color: [0.55, 0.15, 0.65], top: 36, accel: 24, brake: 32, grip: 2.9 }, 0, 27, -Math.PI / 2, { driver: false });
+    game.garageState.upgrades.engine = 2;
+    game.garageState.upgrades.tires = 1;
+    game.garageState.upgrades.nitro = 2;
+    player.inCar = true; player.car = car; player.x = 0; player.z = 27; player.angle = -Math.PI / 2; player.speed = 26;
+    car.speed = 26;
+    car.nitroBoost = 0.8;
+    addWanted(game.police, 5);
+    game.police.spawnTimer = 0;
+    stagePolice(api, [[-35, 23, Math.PI / 2], [-38, 31, Math.PI / 2], [30, 27, -Math.PI / 2], [-20, 31, Math.PI / 2]]);
+    game.police.heli = { angle: 0.6, x: -28, z: 22, y: 12, unit: HELI_UNIT };
+    game.police.roadblock = { x: -42, z: 27, angle: Math.PI / 2, unit: VCPD_UNITS[2] };
+    deployStrip(game.police.spikes, -55, 27, Math.PI / 2, 'VCPD-52', 0);
+    stageWreck(api, 18, 33, Math.PI / 2);
+    addRespect(game.respect, 1200);
+    game.radioState.index = 2; // STORM RADIO — Weather Band
+    api.startMission();
+    stageGps(api);
+    game.msg = null;
+    game.cash = 41200;
+    return;
+  }
+  if (name === 'business') {
+    // v6 hero: Mara on foot on the marina quay, facing SOUTH toward
+    // the sea — the Marina Fish Market ahead of her, bought and paid
+    // for: its gold sign and level pips overhead, yachts and cranes in
+    // the frame, mission 13 (Storm Warning) active with the GPS route
+    // on. She stands just north of the market's own spot (237,243),
+    // 11m from the sign post, so the sign is dead centre in frame.
+    game.cash = 50000;
+    buyBiz(game.business, 'fish-market', game.cash);
+    game.cash -= 5000;
+    player.inCar = false; player.car = null;
+    player.x = 237; player.z = 232; player.angle = 0;
+    addRespect(game.respect, 1500);
+    game.radioState.index = 4; // MARINA 99.9 — Yacht Rock
+    game.missions.index = 12; // Storm Warning
+    api.startMission();
+    stageGps(api);
+    game.msg = null;
+    game.cash = 45000;
+    return;
+  }
+  if (name === 'arc') {
+    // v6 hero: the King of Vesper finale, mission 15. Mara drives the
+    // Storm Chaser 4x4 (amber light bar) at dusk on the marina quay,
+    // the level-2 fish market ahead of her with two gold pips, the
+    // lighthouse beam sweeping the harbour, and the finale's GPS route
+    // on. The gate is genuinely met here: the market is bought and
+    // upgraded to level 2, and respect is over 2,000.
+    game.cash = 60000;
+    let r = buyBiz(game.business, 'fish-market', game.cash);
+    if (r.ok) game.cash -= r.cost;
+    r = upgradeBiz(game.business, 'fish-market', game.cash);
+    if (r.ok) game.cash -= r.cost;
+    const car = makeCar({ id: 'storm4x4', name: 'Storm Chaser', color: [0.2, 0.35, 0.3], top: 29, accel: 20, brake: 30, grip: 3.2 }, 237, 252, Math.PI, { driver: false });
+    player.inCar = true; player.car = car; player.x = 237; player.z = 252; player.angle = Math.PI; player.speed = 0;
+    addRespect(game.respect, 2400);
+    game.radioState.index = 5; // HURRICANE 88.8 — Storm Watch
+    game.missions.index = 14; // King of Vesper
+    api.startMission();
+    stageGps(api);
+    game.msg = null;
+    game.cash = 50000;
     return;
   }
   if (name === 'wheel') {

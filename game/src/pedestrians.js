@@ -50,7 +50,10 @@ export function spawnCrew(rng, garage) {
   }));
 }
 
-export function stepPedestrians(peds, dt, player, cars, gunshot, buildings) {
+export function stepPedestrians(peds, dt, player, cars, gunshot, buildings, weather) {
+  // v6: in a storm, everyone hurries — the crowd moves almost twice
+  // as fast, running for cover instead of strolling the boulevard.
+  const hurry = weather && weather.phase === 'storm' ? 1.8 : 1;
   for (const p of peds) {
     if (p.dead) continue;
     // Flee from the player when they are armed/dangerous, from gunfire, or from a fast car.
@@ -74,8 +77,8 @@ export function stepPedestrians(peds, dt, player, cars, gunshot, buildings) {
     }
     // Wander: drift along sidewalks, turn at random.
     if (p.flee <= 0 && Math.random() < dt * 0.2) p.angle += (Math.random() - 0.5) * 2.4;
-    p.x += Math.sin(p.angle) * p.speed * dt;
-    p.z += Math.cos(p.angle) * p.speed * dt;
+    p.x += Math.sin(p.angle) * p.speed * hurry * dt;
+    p.z += Math.cos(p.angle) * p.speed * hurry * dt;
     if (buildings) {
       const fixed = resolveBuildingCollision(p.x, p.z, 0.6, buildings);
       p.x = fixed.x; p.z = fixed.z;

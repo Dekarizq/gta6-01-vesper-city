@@ -42,12 +42,21 @@ export const GARAGE_UPGRADES = [
     costs: [600, 1200, 2200],
     chromeBonus: [1, 2, 3],
   },
+  // v6: STORM TYRES — deep-tread rain tyres for the hurricane week.
+  // They add grip, and grip is what the storm takes away: each level
+  // adds 0.3 grip, on top of the normal tyre bonus, so a storm-kitted
+  // car holds the wet road when a stock car slides.
+  {
+    id: 'storm', name: 'STORM TYRES', blurb: 'Deep-tread rain tyres — grip that holds in the storm',
+    costs: [700, 1300, 2400],
+    gripBonus: [0.3, 0.6, 0.9],
+  },
 ];
 
 export function createGarage() {
   return {
     owned: ['sedan'],
-    upgrades: { engine: 0, armour: 0, tires: 0, nitro: 0, chrome: 0 },
+    upgrades: { engine: 0, armour: 0, tires: 0, nitro: 0, chrome: 0, storm: 0 },
     car: 'sedan',
     lastBought: null,
   };
@@ -85,24 +94,27 @@ export function buyUpgrade(garage, cash, id, crewDiscount = 0) {
 // and its launch bonus is strongest from a standstill (the vehicle code
 // applies it when speed is near zero).
 export function applyUpgrades(carType, upgrades) {
-  const u = upgrades || { engine: 0, armour: 0, tires: 0, nitro: 0, chrome: 0 };
+  const u = upgrades || { engine: 0, armour: 0, tires: 0, nitro: 0, chrome: 0, storm: 0 };
   const eng = GARAGE_UPGRADES[0];
   const arm = GARAGE_UPGRADES[1];
   const tir = GARAGE_UPGRADES[2];
   const nit = GARAGE_UPGRADES[3];
+  const sto = GARAGE_UPGRADES[5];
   const e = clamp(u.engine || 0, 0, 3);
   const a = clamp(u.armour || 0, 0, 3);
   const t = clamp(u.tires || 0, 0, 3);
   const n = clamp(u.nitro || 0, 0, 3);
+  const s = clamp(u.storm || 0, 0, 3);
   return {
     top: carType.top + (e > 0 ? eng.topBonus[e - 1] : 0) + (n > 0 ? nit.topBonus[n - 1] : 0),
     accel: carType.accel + (e > 0 ? eng.accelBonus[e - 1] : 0),
     brake: carType.brake,
-    grip: carType.grip + (t > 0 ? tir.gripBonus[t - 1] : 0),
+    grip: carType.grip + (t > 0 ? tir.gripBonus[t - 1] : 0) + (s > 0 ? sto.gripBonus[s - 1] : 0),
     armourBonus: a > 0 ? arm.armourBonus[a - 1] : 0,
     nitro: n,
     nitroLaunch: n > 0 ? nit.accelBonus[n - 1] : 0,
     chrome: clamp(u.chrome || 0, 0, 3),
+    storm: s,
   };
 }
 
@@ -119,7 +131,7 @@ export function garageLoad(data) {
   if (!data) return g;
   if (Array.isArray(data.owned) && data.owned.length > 0) g.owned = [...data.owned];
   if (data.upgrades) {
-    for (const id of ['engine', 'armour', 'tires', 'nitro', 'chrome']) {
+    for (const id of ['engine', 'armour', 'tires', 'nitro', 'chrome', 'storm']) {
       const v = data.upgrades[id];
       if (Number.isInteger(v)) g.upgrades[id] = clamp(v, 0, 3);
     }

@@ -227,6 +227,13 @@ export function carBoxes(car, time = 0) {
   if (car.type && car.type.id === 'bus') {
     boxes.push({ x: car.x, y: 1.25, z: car.z, w: 1.9, h: 0.7, d: len * 0.7, color: paint.glass, yaw: car.angle });
   }
+  // v6: the Storm Chaser 4x4 wears a roof rack, a snorkel, and an
+  // amber light bar — the truck that works the flooded harbour roads.
+  if (car.type && car.type.id === 'storm4x4') {
+    boxes.push({ x: car.x, y: 1.45, z: car.z - 0.4, w: 1.7, h: 0.16, d: 1.9, color: [0.2, 0.2, 0.22], yaw: car.angle });
+    boxes.push({ x: car.x + 0.7, y: 1.1, z: car.z + 0.8, w: 0.18, h: 0.9, d: 0.18, color: [0.15, 0.15, 0.18], yaw: car.angle });
+    boxes.push({ x: car.x, y: 1.62, z: car.z - 0.2, w: 1.2, h: 0.3, d: 0.4, color: [1, 0.65, 0.15], yaw: car.angle });
+  }
   // Four wheels with bright rims, two headlights, two taillights.
   for (const [wx, wz] of [[-0.95, half - 0.7], [0.95, half - 0.7], [-0.95, -(half - 0.7)], [0.95, -(half - 0.7)]]) {
     boxes.push({

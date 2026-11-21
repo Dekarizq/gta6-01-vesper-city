@@ -1,13 +1,15 @@
-// coast.js — the Sunset Beach coast for Sunset Kings v4. Vesper City
+// coast.js — the Sunset Beach coast for Sunset Kings v6. Vesper City
 // always had a beach on its south shore, but v3 never let you play on
 // it: the sand was scenery. V4 turns it into a place: a wooden pier
 // running out over the sunset water, a boardwalk with stalls, a boat
 // dock with bobbing boats, a lifeguard tower, surfers and sunbathers,
 // and the tide itself breathing in and out. Missions 11 and 12 run
 // here, the new side jobs start here, and the coast is a district of
-// its own on the HUD and the map. Pure logic plus render boxes; the
-// engine draws the static sand and water, this module adds everything
-// that moves or stands on it.
+// its own on the HUD and the map. v6: the storm surge swells the tide
+// and the boats pitch harder when the hurricane front arrives, and the
+// surfers get out of the water when it does. Pure logic plus render
+// boxes; the engine draws the static sand and water, this module adds
+// everything that moves or stands on it.
 import { citySize } from './city.js';
 import { clamp, dist2 } from './random.js';
 
@@ -107,12 +109,23 @@ export function tideLevel(coast, time) {
   return t;
 }
 
-export function stepCoast(coast, dt, player) {
+// Storm surge: how much higher the tide runs in the hurricane front
+// (0 in gold weather, up to +1 when the storm is overhead). The water
+// boxes and the boat bob read this through the tide.
+export function stormSurge(weather) {
+  if (!weather) return 0;
+  return weather.phase === 'storm' ? 1 : weather.stormFront > 0.8 ? 0.5 : 0;
+}
+
+export function stepCoast(coast, dt, player, weather) {
   coast.time += dt;
+  coast.surge = stormSurge(weather);
   tideLevel(coast, coast.time);
   // v5: the sailboats cross the sea, east to west, and wrap around.
+  // v6: in a storm they reef and slow — nobody sails into a hurricane.
+  const sailFactor = weather && weather.phase === 'storm' ? 0.4 : 1;
   for (const s of coast.sailboats || []) {
-    s.x += s.speed * dt;
+    s.x += s.speed * sailFactor * dt;
     if (s.x > 260) s.x = -260;
   }
   // Surfers paddle out to sea and drift back, on a 40-second loop.

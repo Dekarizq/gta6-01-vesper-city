@@ -1,17 +1,19 @@
-// collectibles.js — Sun Coins: 30 golden coins hidden across Vesper City.
+// collectibles.js — Sun Coins: 42 golden coins hidden across Vesper City.
 // A free-roam side hunt for the golden hour: each coin is a spinning gold
-// slab at a named crossing, worth a chime and a HUD count. Grab all 30 in
+// slab at a named crossing, worth a chime and a HUD count. Grab all 42 in
 // one in-game day and Dario pays a $500 bonus. At dawn the coins come back —
 // the city re-hides them every morning, so the hunt never truly ends.
 // Pure logic: no DOM, no network, no randomness at runtime. The coin spots
 // sit on road intersections (roadCross), so every coin is reachable on foot
 // or by car, and the save file remembers which ones today already took.
 // v4 adds six coast coins along the south beach road (the iz=9 line):
-// the hunt now runs from Sunset Mile all the way to the pier.
+// the hunt now runs from Sunset Mile all the way to the pier. v6 adds
+// six storm coins by the harbour warehouses and the storm drains, for
+// the drivers who hunt while the front comes in.
 
 import { roadCross } from './city.js';
 
-export const SUN_COIN_COUNT = 30;
+export const SUN_COIN_COUNT = 42;
 export const SUN_COIN_BONUS = 500;
 // v3: every Sun Coin also pays respect — the hunt feeds the Sunset Kings
 // ladder, and a chained streak pays respect on top of cash.
@@ -68,6 +70,13 @@ const SPOTS = [
   { ix: 1, iz: 0, name: 'Old Town gate' },
   { ix: 2, iz: 0, name: 'Night market lane' },
   { ix: 3, iz: 0, name: 'Church square' },
+  // v6 storm coins: by the harbour warehouses and the storm drains.
+  { ix: 1, iz: 9, name: 'Warehouse gate' },
+  { ix: 2, iz: 8, name: 'Storm drain corner' },
+  { ix: 9, iz: 7, name: 'Crane yard' },
+  { ix: 0, iz: 5, name: 'North storm drain' },
+  { ix: 9, iz: 5, name: 'East warehouse' },
+  { ix: 0, iz: 9, name: 'Flood wall' },
 ];
 
 function dist2(ax, az, bx, bz) {

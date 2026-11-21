@@ -27,6 +27,9 @@ export function createRandom(seed) {
   };
 }
 export function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+// v6: a seeded coin flip — true with probability p (0..1), drawn from
+// the game's rng so a test with the same seed always flips the same way.
+export function chance(rng, p) { return rng.next() < p; }
 // v5: a normal-distributed value (Box-Muller on the seeded rng) so
 // crowd speeds cluster around a natural average instead of spreading
 // flat across a range — walkers mostly stroll, a few hurry.

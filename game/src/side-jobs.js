@@ -105,10 +105,13 @@ export function cancelJob(jobs) {
 // Step the active job. Returns events in order: 'pickup' when the
 // parcel/fare is collected, 'checkpoint' for each race gate, 'done'
 // with the payout, or 'expired' when the timer runs out.
-export function updateJob(jobs, px, pz, dt, elapsed) {
+export function updateJob(jobs, px, pz, dt, elapsed, weather) {
   const job = jobs.active;
   if (!job) return [];
   const events = [];
+  // v6: working in the storm pays 25% extra — hazard pay for driving
+  // the front. The bonus is folded into the done event's pay.
+  const stormPay = weather && weather.phase === 'storm';
   job.timeLeft -= dt;
   if (job.timeLeft <= 0) {
     jobs.active = null;
@@ -125,11 +128,13 @@ export function updateJob(jobs, px, pz, dt, elapsed) {
       if (job.cpIndex >= job.checkpoints.length) {
         const time = elapsed - job.startedAt;
         const parBonus = job.par && time <= job.par ? 200 : 0;
+        const base = job.def.pay + parBonus;
+        const pay = stormPay ? Math.round(base * 1.25) : base;
         jobs.active = null;
         jobs.done.race += 1;
-        jobs.earned += job.def.pay + parBonus;
+        jobs.earned += pay;
         if (jobs.bestRace === null || time < jobs.bestRace) jobs.bestRace = time;
-        events.push({ type: 'done', job, pay: job.def.pay + parBonus, respect: job.def.respect, time, parBonus });
+        events.push({ type: 'done', job, pay, respect: job.def.respect, time, parBonus, stormBonus: stormPay });
       }
     }
     return events;
@@ -140,10 +145,11 @@ export function updateJob(jobs, px, pz, dt, elapsed) {
     return events;
   }
   if (job.stage === 'deliver' && reach(job.dropoff, 9)) {
+    const pay = stormPay ? Math.round(job.def.pay * 1.25) : job.def.pay;
     jobs.active = null;
     jobs.done[job.type] += 1;
-    jobs.earned += job.def.pay;
-    events.push({ type: 'done', job, pay: job.def.pay, respect: job.def.respect, time: elapsed - job.startedAt, parBonus: 0 });
+    jobs.earned += pay;
+    events.push({ type: 'done', job, pay, respect: job.def.respect, time: elapsed - job.startedAt, parBonus: 0, stormBonus: stormPay });
   }
   return events;
 }

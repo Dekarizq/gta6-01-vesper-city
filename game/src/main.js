@@ -1,5 +1,5 @@
-// main.js — boot and the one loop for Vesper City: Golden Hour — Sunset Kings v5.
-// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown stages a deterministic frozen
+// main.js — boot and the one loop for Vesper City: Golden Hour — Sunset Kings v6.
+// ?shot=start|chase|street|mission|coast|wheel|marina|oldtown|storm|business stages a deterministic frozen
 // scene and sets window.__shotReady once it has settled, for screenshots.
 // Otherwise the game runs from the title screen: start, drive, steal, run
 // missions, tune the car at the Sunset Garage, switch radio stations, build
@@ -10,11 +10,15 @@
 // v5: the city is visually rebuilt — lit window facades, street lamps,
 // trees, billboards, the Marina District and Old Town, denser traffic
 // with five new car models, clouds, birds and sea glints.
+// v6: the week gets real weather (day cycle, rain, lightning, the
+// hurricane front), B buys and upgrades businesses that pay daily
+// income, and a three-mission arc (13-15) crowns Mara King of Vesper.
 import { STEP, SAVE_KEY, GAME_TITLE, WHEEL_HOLD_MS } from './config.js';
 import { createRandom } from './random.js';
 import { createGame, SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSED, SCREEN_DEAD } from './world.js';
-import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM, ACT_WEAPON1, ACT_WEAPON2, ACT_WEAPON3, ACT_WEAPON4, ACT_GARAGE, ACT_RADIO, ACT_JOB, ACT_GPS, ACT_SLOT, ACT_HUD } from './input.js';
+import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM, ACT_WEAPON1, ACT_WEAPON2, ACT_WEAPON3, ACT_WEAPON4, ACT_GARAGE, ACT_RADIO, ACT_JOB, ACT_GPS, ACT_SLOT, ACT_HUD, ACT_BUSINESS } from './input.js';
 import { createEngine, chaseCamera, collideCamera } from './engine.js';
+import { weatherRender } from './weather.js';
 import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
 import { hasSave, saveGame, loadGame } from './save.js';
@@ -50,8 +54,8 @@ function startNew() {
   screen = SCREEN_PLAY;
   hud.hideTitle(); hud.hidePause(); hud.hideDead();
   audio.unlock();
-  hud.message('Welcome to Vesper City, Sunset King. Tap Q to start your first mission, hold Q for the weapon wheel, J for side jobs — and drive the new Marina District and Old Town when you have cash.', 7);
-  announce('Playing Vesper City: Golden Hour — Sunset Kings v4.');
+  hud.message('Welcome to Vesper City, Sunset King. Tap Q to start your first mission, hold Q for the weapon wheel, J for side jobs, B near a FOR SALE board to buy a business — and watch the sky: the hurricane front is coming.', 7);
+  announce('Playing Vesper City: Golden Hour — Sunset Kings v6.');
 }
 
 function continueSaved() {
@@ -121,6 +125,7 @@ function handleActions() {
   if (a & ACT_MISSION) api.startMission();
   if (a & ACT_JOB) { const j = api.startSideJob(); if (j && audio.horn) audio.horn(); }
   if (a & ACT_GPS) api.toggleGps();
+  if (a & ACT_BUSINESS) api.buyBusiness();
   if (a & ACT_SLOT) api.cycleSaveSlot();
   if (a & ACT_RESTART) api.restartMission();
   if (a & ACT_MAP) { game.mapOpen = !game.mapOpen; hud.toggleMap(game.mapOpen); }
@@ -175,7 +180,9 @@ function frame(now) {
     cam = collideCamera(chaseCamera(p.x, p.z, p.angle, Math.abs(p.speed || 0), p.inCar), game.city.buildings);
   }
   const boxes = api.collectBoxes(game.time);
-  engine.draw(cam, boxes, game.time);
+  // v6: the weather drives the sky and the fog — gold by day, grey in
+  // the storm front, deep blue at night, bleached on a lightning strike.
+  engine.draw(cam, boxes, game.time, game.weather ? weatherRender(game.weather) : undefined);
   if (screen !== SCREEN_TITLE) hud.update(api.hudState(), dt);
   if (game.msg) { hud.message(game.msg, 4); game.msg = null; }
   if (shot) {

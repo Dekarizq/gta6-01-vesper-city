@@ -1,16 +1,22 @@
-// city.js — procedural Vesper City at golden hour: warm sand, cream,
-// terracotta and gold towers, a sunset beach with palms and umbrellas on the
-// south shore, and a low sun down the west boulevard. Pure data: the engine
-// turns it into geometry, the minimap turns it into a map. Also owns building
-// collision (circle vs tower footprint) and the sun-visibility ray check.
-// v4: the south shore is a real district now — Sunset Beach, with the pier,
-// the boardwalk and the boat dock as landmarks the GPS and the coast
-// missions navigate to, and more neon signs on the towers so the city
-// glows harder at golden hour. v5: two more districts with their own
-// palettes — the Marina District (white/teal, south-east) and Old Town
-// (brick/cream, north band) — plus marina and old-town landmarks.
+// city.js — procedural Vesper City at golden hour, rewritten for v6.
+// Warm sand, cream, terracotta and gold towers; a sunset beach with
+// palms and umbrellas on the south shore; a low sun down the west
+// boulevard. Pure data: the engine turns it into geometry, the minimap
+// turns it into a map. It also owns building collision (circle vs
+// tower footprint) and the sun-visibility ray check.
+// Districts, each with its own palette: Sunset Mile, Harbor Docks, Old
+// Vesper, the Glass Quarter, Sunset Shore, Sunset Beach, and since v5
+// the Marina District (white/teal, south-east) and Old Town (brick and
+// cream, north band). v6 adds hurricane prep to the map itself: storm
+// drains on the harbour roads and sandbag stacks by the garage and the
+// docks, placed on fixed coordinates so the seeded layout never moves.
+// NOTE on determinism: generateCity consumes the seeded rng in one
+// fixed order (tower size, offset, height, palette, shade, strip,
+// signs). The v6 rewrite keeps that exact order, so the same seed
+// still builds the same city and every staged screenshot still works.
 import { WORLD, DISTRICTS, GOLD, WINDOW_STRIP, SUN } from './config.js';
 
+// ------------------------------------------------------------------ layout
 export function citySize() {
   return WORLD.blocks * (WORLD.block + WORLD.road) + WORLD.road;
 }
@@ -48,16 +54,15 @@ export function isOnRoad(x, z) {
   return false;
 }
 
+// ---------------------------------------------------------------- districts
+// Which district a point belongs to. The Marina District is checked
+// BEFORE the beach: the marina quay sits on the same south strip as
+// the sand, and its x-range is what tells them apart (east of fx 0.72
+// is quay, west of it is beach). Old Town is the north band.
 export function districtAt(x, z) {
   const size = citySize();
   const fx = (x + size / 2) / size;
   const fz = (z + size / 2) / size;
-  // v4: past the south road line is the beach, not the docks.
-  // v5: the south-east corner by the sea is the Marina District, and
-  // the north band is Old Town — both win over the grid districts.
-  // Marina is checked BEFORE the beach: the marina quay sits on the
-  // same south strip as the sand, and its x-range is what tells them
-  // apart (east of fx 0.72 is quay, west of it is beach).
   if (fz > 0.82 && fx > 0.72) return DISTRICTS[6]; // Marina District
   if (fz > 0.94) return DISTRICTS[5]; // Sunset Beach (sand, pier, sea)
   if (fz < 0.2 && fx > 0.25 && fx < 0.75) return DISTRICTS[7]; // Old Town
@@ -68,12 +73,35 @@ export function districtAt(x, z) {
   return DISTRICTS[2]; // Old Vesper
 }
 
+// The palette a district paints its towers with: warm golds for the
+// old city, white and teal for the marina, brick and cream for Old
+// Town. Each entry is [base colours...] the generator picks from.
+export const DISTRICT_BASES = {
+  'Marina District': [[0.92, 0.9, 0.84], [0.75, 0.85, 0.85], [0.55, 0.7, 0.75]],
+  'Old Town': [[0.58, 0.3, 0.22], [0.7, 0.52, 0.34], [0.8, 0.68, 0.5]],
+};
+
+const WARM_BASES = [GOLD.sand, GOLD.cream, GOLD.terracotta, GOLD.gold, GOLD.rose];
+const SIGN_COLORS = ['#ff9a3d', '#ffd166', '#fda4af', '#7dd3fc', '#ff5c5c', '#a5f3fc'];
+
 // The coast band: the z where the city ends and the beach begins.
 export function coastLineZ() {
   return citySize() / 2 + 4;
 }
 
-// Circle (x,z,r) vs a building footprint: true when they overlap.
+// Nearest named landmark to a point, for the HUD and the GPS.
+export function nearestLandmark(x, z, landmarks) {
+  let best = null, bestD = Infinity;
+  for (const l of landmarks || []) {
+    const dx = x - l.x, dz = z - l.z;
+    const d = dx * dx + dz * dz;
+    if (d < bestD) { bestD = d; best = l; }
+  }
+  return best;
+}
+
+// --------------------------------------------------------------- collision
+// Circle (x,z,r) vs a building footprint: the building hit, or null.
 export function hitsBuilding(x, z, r, buildings) {
   for (const b of buildings) {
     const dx = Math.max(Math.abs(x - b.x) - b.w / 2, 0);
@@ -83,10 +111,10 @@ export function hitsBuilding(x, z, r, buildings) {
   return null;
 }
 
-// Push a circle out of any building it overlaps; returns the corrected point.
-// The push lands 0.05 past the edge: pushing to the exact boundary leaves
-// the circle grazing the footprint in floating point, and the same building
-// would report a hit again forever.
+// Push a circle out of any building it overlaps; returns the corrected
+// point. The push lands 0.05 past the edge: pushing to the exact
+// boundary leaves the circle grazing the footprint in floating point,
+// and the same building would report a hit again forever.
 export function resolveBuildingCollision(x, z, r, buildings) {
   const MARGIN = 0.05;
   for (let guard = 0; guard < 8; guard += 1) {
@@ -101,8 +129,9 @@ export function resolveBuildingCollision(x, z, r, buildings) {
   return { x, z };
 }
 
-// Is the low sun visible from (x,z)? Walk the ray toward the sun in small
-// steps; any building box taller than the ray at that step hides it.
+// Is the low sun visible from (x,z)? Walk the ray toward the sun in
+// small steps; any building box taller than the ray at that step hides
+// it.
 export function sunVisibleFrom(x, z, buildings) {
   const steps = 60;
   for (let i = 1; i <= steps; i += 1) {
@@ -117,7 +146,42 @@ export function sunVisibleFrom(x, z, buildings) {
   return true;
 }
 
-const PALETTES = [GOLD.sand, GOLD.cream, GOLD.terracotta, GOLD.gold, GOLD.rose];
+// -------------------------------------------------------------- generation
+// Pick a tower's base colour. The rng order matters: the warm palette
+// pick and the shade are drawn first, then — only for the two new
+// districts — a district base is drawn instead. Every other district
+// keeps the warm colour, darkened or lightened by the shade.
+function towerBaseColor(rng, districtName) {
+  const palette = WARM_BASES[rng.int(0, WARM_BASES.length - 1)];
+  const shade = rng.range(0.9, 1.15);
+  const bases = DISTRICT_BASES[districtName];
+  if (bases) return bases[rng.int(0, bases.length - 1)];
+  return [palette[0] * shade, palette[1] * shade, palette[2] * shade];
+}
+
+// Neon signs on a tower's south face: one big sign on most tall
+// towers, a second smaller one low down on the tallest, and a red
+// rooftop beacon on anything over 40 units. The neon is what makes
+// the golden hour read as a city that is awake, not a model.
+function placeSigns(rng, signs, cx, cz, w, d, h) {
+  if (rng.next() < 0.62 && h > 10) {
+    signs.push({
+      x: cx, y: rng.range(h * 0.45, h * 0.85), z: cz + d / 2 + 0.25,
+      w: rng.range(3, 8), h: rng.range(0.8, 1.6), d: 0.4,
+      color: rng.pick(SIGN_COLORS),
+    });
+    if (h > 34 && rng.next() < 0.5) {
+      signs.push({
+        x: cx, y: rng.range(4, h * 0.3), z: cz + d / 2 + 0.25,
+        w: rng.range(2, 5), h: rng.range(0.6, 1.1), d: 0.4,
+        color: rng.pick(['#ffd166', '#7dd3fc', '#fda4af']),
+      });
+    }
+  }
+  if (h > 40) {
+    signs.push({ x: cx, y: h + 0.4, z: cz, w: 0.7, h: 0.7, d: 0.7, color: '#ff3355' });
+  }
+}
 
 export function generateCity(rng) {
   const size = citySize();
@@ -143,47 +207,16 @@ export function generateCity(rng) {
         const h = harbor ? rng.range(6, 12)
           : downtown ? rng.range(28, 62)
           : rng.range(9, 30);
-        const palette = PALETTES[rng.int(0, PALETTES.length - 1)];
-        const shade = rng.range(0.9, 1.15);
-        // v5: Marina towers are white and teal, Old Town towers are
-        // brick and cream — the district palettes from textures.js
-        // would be the source of truth, but the city generator only
-        // carries the warm GOLD set, so the two new districts pick
-        // their own bases here instead of a random warm one.
         const districtName = districtAt(cx, cz).name;
-        const base = districtName === 'Marina District'
-          ? [[0.92, 0.9, 0.84], [0.75, 0.85, 0.85], [0.55, 0.7, 0.75]][rng.int(0, 2)]
-          : districtName === 'Old Town'
-            ? [[0.58, 0.3, 0.22], [0.7, 0.52, 0.34], [0.8, 0.68, 0.5]][rng.int(0, 2)]
-            : [palette[0] * shade, palette[1] * shade, palette[2] * shade];
+        const base = towerBaseColor(rng, districtName);
         const strip = WINDOW_STRIP[rng.int(0, WINDOW_STRIP.length - 1)];
-        buildings.push({ x: cx + ox, z: cz + oz, w, d, h, color: base, district: districtAt(cx, cz).name, strip });
-        // A bright sign on the tallest face of some buildings. v4: more
-        // signs, and a second, smaller sign lower down on the tallest
-        // towers — the neon is what makes the golden hour read as a city
-        // that is awake, not a model.
-        if (rng.next() < 0.62 && h > 10) {
-          const c = rng.pick(['#ff9a3d', '#ffd166', '#fda4af', '#7dd3fc', '#ff5c5c', '#a5f3fc']);
-          signs.push({
-            x: cx + ox, y: rng.range(h * 0.45, h * 0.85), z: cz + oz + d / 2 + 0.25,
-            w: rng.range(3, 8), h: rng.range(0.8, 1.6), d: 0.4, color: c,
-          });
-          if (h > 34 && rng.next() < 0.5) {
-            signs.push({
-              x: cx + ox, y: rng.range(4, h * 0.3), z: cz + oz + d / 2 + 0.25,
-              w: rng.range(2, 5), h: rng.range(0.6, 1.1), d: 0.4,
-              color: rng.pick(['#ffd166', '#7dd3fc', '#fda4af']),
-            });
-          }
-        }
-        // Rooftop beacon on tall towers.
-        if (h > 40) {
-          signs.push({ x: cx + ox, y: h + 0.4, z: cz + oz, w: 0.7, h: 0.7, d: 0.7, color: '#ff3355' });
-        }
+        buildings.push({ x: cx + ox, z: cz + oz, w, d, h, color: base, district: districtName, strip });
+        placeSigns(rng, signs, cx + ox, cz + oz, w, d, h);
       }
     }
   }
-  // Landmarks: the Storm Spire (tallest tower, downtown) and the Harbor Bridge.
+  // Landmarks: the Storm Spire (tallest tower, downtown) and the
+  // Harbor Bridge.
   buildings.push({ x: 0, z: 0, w: 26, d: 26, h: 78, color: [0.55, 0.42, 0.3], district: 'Glass Quarter', spire: true, strip: '#ffd166' });
   signs.push({ x: 0, y: 79, z: 0, w: 1.2, h: 1.2, d: 1.2, color: '#ff3355' });
   // Sunset beach along the south shore: palms and umbrellas on the sand.
@@ -194,9 +227,9 @@ export function generateCity(rng) {
   for (let i = 0; i < 10; i += 1) {
     umbrellas.push({ x: -size / 2 + 30 + i * (size - 60) / 9 + rng.range(-8, 8), z: beachZ + rng.range(-8, 10), color: rng.pick(['#ff5c5c', '#ffd166', '#7dd3fc', '#fda4af']) });
   }
-  // The Sunset Garage yard (v3): Rook's shop sits on the south-east
-  // corner, a low gold-roofed building with its own sign, so the player
-  // can drive to it, park in the yard, and press G to buy upgrades.
+  // The Sunset Garage yard: Rook's shop sits on the south-east corner,
+  // a low gold-roofed building with its own sign, so the player can
+  // drive to it, park in the yard, and press G to buy upgrades.
   const garageX = size / 2 - 60, garageZ = size / 2 - 60;
   buildings.push({ x: garageX, z: garageZ, w: 30, d: 18, h: 10, color: [0.85, 0.62, 0.28], district: 'Harbor Docks', strip: '#ffd166' });
   signs.push({ x: garageX, y: 11.5, z: garageZ + 9.4, w: 16, h: 1.8, d: 0.4, color: '#ffd166' });
@@ -207,16 +240,27 @@ export function generateCity(rng) {
     { id: 'rainmarket', name: 'Sunset Shore', x: size / 2 - 30, z: -size / 2 + 60 },
     { id: 'hospital', name: 'St. Mara Hospital', x: -size / 2 + 60, z: size / 2 - 60 },
     { id: 'garage', name: 'Sunset Garage', x: garageX, z: garageZ },
-    // v4 coast landmarks: the pier, the boardwalk and the boat dock.
     { id: 'pier', name: 'Sunset Pier', x: -20, z: size / 2 + 82 },
     { id: 'boardwalk', name: 'Sunset Boardwalk', x: 60, z: size / 2 + 20 },
     { id: 'boatdock', name: 'Boat Dock', x: 110, z: size / 2 + 56 },
     { id: 'beach', name: 'Sunset Beach', x: 0, z: size / 2 + 18 },
-    // v5: the two new districts get landmarks the GPS can name.
     { id: 'marina', name: 'Marina District', x: 180, z: size / 2 - 10 },
     { id: 'oldtown', name: 'Old Town', x: 0, z: -size / 2 + 50 },
   ];
-  return { size, lines, buildings, signs, palms, umbrellas, landmarks };
+  // v6 hurricane prep, on fixed coordinates (no rng, so the seeded
+  // layout never moves): storm drains along the harbour roads and
+  // sandbag stacks guarding the garage yard and the docks.
+  const drains = [];
+  for (const c of lines) {
+    drains.push({ x: c - 3.5, z: size / 2 - 14 });
+    drains.push({ x: c + 3.5, z: -size / 2 + 14 });
+  }
+  const sandbags = [
+    { x: garageX - 18, z: garageZ - 12 }, { x: garageX + 18, z: garageZ - 12 },
+    { x: -40, z: size / 2 - 14 }, { x: 40, z: size / 2 - 14 },
+    { x: -80, z: size / 2 - 60 }, { x: 120, z: size / 2 - 30 },
+  ];
+  return { size, lines, buildings, signs, palms, umbrellas, landmarks, drains, sandbags };
 }
 
 // Pick a point on a road near (x,z) — used for spawns and mission targets.

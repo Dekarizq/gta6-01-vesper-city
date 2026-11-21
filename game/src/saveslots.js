@@ -1,12 +1,14 @@
-// saveslots.js — three save slots for Sunset Kings v4. V3 had one
-// autosave slot and one manual save, both on the same key: quit mid-
-// mission and your only save was the moment you quit. V4 keeps the
-// main save key for the current game, and adds three named slots —
-// SLOT 1 is the autosave (written after every mission and every side
-// job), SLOT 2 and SLOT 3 are the player's own checkpoints. Cycle
-// slots with K, and the HUD always shows which slot is active. Slots
-// live in localStorage beside the main key, same data shape, so a slot
-// loads through exactly the same code path as a normal save.
+// saveslots.js — three save slots for Sunset Kings v4, kept in v6.
+// V3 had one autosave slot and one manual save, both on the same key:
+// quit mid-mission and your only save was the moment you quit. V4
+// keeps the main save key for the current game, and adds three named
+// slots — SLOT 1 is the autosave (written after every mission and
+// every side job), SLOT 2 and SLOT 3 are the player's own checkpoints.
+// Cycle slots with K, and the HUD always shows which slot is active.
+// Slots live in localStorage beside the main key, same data shape, so
+// a slot loads through exactly the same code path as a normal save.
+// v6: the slot summary also names the player's businesses, because a
+// slot from day 5 with a level-2 bar is worth more than one from day 1.
 import { SAVE_KEY } from './config.js';
 import { buildSaveData } from './save.js';
 
@@ -32,6 +34,18 @@ export function createSaveSlots() {
 export function slotLabel(slots) {
   const def = SAVE_SLOTS.find((s) => s.slot === slots.active) || SAVE_SLOTS[0];
   return def.name;
+}
+
+// One-line summary of a saved game for the slot list: day, cash,
+// missions done, and how many businesses the player owns. Slots with
+// no data yet report themselves as empty instead of a blank line.
+export function slotSummary(data) {
+  if (!data || typeof data !== 'object') return 'EMPTY';
+  const owned = (data.business && Array.isArray(data.business.owned)) ? data.business.owned.length : 0;
+  const day = data.day || 1;
+  const cash = typeof data.cash === 'number' ? data.cash : 0;
+  const done = (data.missionsDone || []).length;
+  return `DAY ${day} · $${cash} · ${done}/15 missions · ${owned} business${owned === 1 ? '' : 'es'}`;
 }
 
 export function cycleSlot(slots) {

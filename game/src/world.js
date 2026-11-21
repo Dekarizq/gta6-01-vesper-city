@@ -1,4 +1,4 @@
-// world.js — the game itself for Sunset Kings (v4): player state, the
+// world.js — the game itself for Sunset Kings (v6): player state, the
 // loop's update, and how every system fits together — driving, stealing,
 // police, missions, combat, the storm clock, and the v3 systems: the
 // Sunset Garage upgrade shop, three procedural radio stations, the
@@ -7,12 +7,15 @@
 // (hold Q), missions 11-12 on the Sunset Beach coast, repeatable side
 // jobs (taxi, delivery, street race), spike strips and wanted level 6,
 // a GPS route line to the live target, three save slots with autosave,
-// and the Coast Cruiser convertible. No drawing here except collecting
-// the boxes the engine renders. Golden Hour: building collision keeps
-// cars and pedestrians out of towers, armour absorbs damage before
-// health, and the HUD state carries everything the dense rank-1-style
-// HUD needs.
-import { WORLD, PLAYER, STEP, WEAPONS, GAME_TITLE } from './config.js';
+// and the Coast Cruiser convertible — plus v5: the Marina District and
+// Old Town — plus v6: real weather (day cycle, rain, lightning, the
+// hurricane front), six buyable businesses that pay daily income, and
+// missions 13-15, the arc that crowns Mara King of Vesper. No drawing
+// here except collecting the boxes the engine renders. Golden Hour:
+// building collision keeps cars and pedestrians out of towers, armour
+// absorbs damage before health, and the HUD state carries everything
+// the dense rank-1-style HUD needs.
+import { WORLD, PLAYER, STEP, WEAPONS, GAME_TITLE, WANTED_MAX } from './config.js';
 import { clamp, dist2, angleLerp } from './random.js';
 import { generateCity, citySize, isOnRoad, roadPointNear, resolveBuildingCollision, sunVisibleFrom } from './city.js';
 import { makeCar, spawnTraffic, stepTraffic, stepPlayerCar, nearestCar, carBoxes, damageCar, stepBurning } from './vehicles.js';
@@ -23,7 +26,7 @@ import { createCombat, shoot, punch, stepCombat, switchWeapon, currentWeapon, ap
 import { createCollectibles, SUN_COIN_BONUS, SUN_COIN_RESPECT, SUN_STREAK_RESPECT } from './collectibles.js';
 import { createGarage, buyUpgrade, applyUpgrades, garageCost, garageLoad, garageBoxes, GARAGE_UPGRADES } from './garage.js';
 import { createRadio, nextStation, radioStep, radioLabel, RADIO_STATIONS } from './radio.js';
-import { createRespect, addRespect, crewJoined, garageDiscount, streakMultiplier, missionCashMultiplier, sideJobCashMultiplier, respectLoad, respectRank, RESPECT_POINTS } from './respect.js';
+import { createRespect, addRespect, businessRespect, crewJoined, garageDiscount, streakMultiplier, missionCashMultiplier, sideJobCashMultiplier, respectLoad, respectRank, RESPECT_POINTS } from './respect.js';
 // v4 systems.
 import { createCoast, stepCoast, coastBoxes, coastNameAt, isOnCoast, nearestCoastPoint, coastLoad } from './coast.js';
 import { createSideJobs, startJob, nextJobType, updateJob, jobTarget, jobLabel, jobBoxes, jobsSummary, jobsLoad } from './side-jobs.js';
@@ -35,6 +38,10 @@ import { FINALE_BONUS } from './missions-extra.js';
 // v5 systems: the two new districts and the visual overhaul.
 import { createDistricts, stepDistricts, districtBoxes, districtNameAt, districtsLoad } from './districts.js';
 import { decorateCity, visualsBoxes } from './visuals.js';
+// v6 systems: real weather, buyable businesses, and the story arc.
+import { createWeather, stepWeather, weatherLabel, weatherForecastText, weatherRender, wantedMultiplier, trafficFactor, weatherBoxes, weatherSave, weatherLoad } from './weather.js';
+import { createBusiness, buyBusiness as buyBiz, upgradeBusiness, businessLevel, collectIncome, nearestBusiness, businessBoxes, businessSummary, nextUpgradeHint, businessSave, businessLoad } from './business.js';
+import { ARC_FINALE_BONUS, arcGateMet } from './missions-arc.js';
 import { districtAt } from './city.js';
 import { muzzleColor } from './combat.js';
 import { gpsLabelWithDistrict } from './gps.js';
@@ -82,6 +89,12 @@ export function createGame(rng) {
     saveSlots: createSaveSlots(),
     // v5: the two new districts, stepped by the world loop.
     districts,
+    // v6: the weather (day cycle, rain, lightning, hurricane front)
+    // and the business portfolio (six properties, daily income).
+    weather: createWeather(),
+    business: createBusiness(),
+    heatTimer: 0,
+    lastStrikes: 0,
   };
   game.spikes = game.police.spikes;
   // v5: denser streets — 22 traffic cars and 36 pedestrians instead
@@ -111,6 +124,12 @@ export function createGame(rng) {
     game.wheel = createWeaponWheel();
     game.spikes = game.police.spikes;
     game.saveSlots = createSaveSlots();
+    // v6: a new game starts on a clear golden evening with no
+    // properties — the storm and the portfolio build from nothing.
+    game.weather = createWeather();
+    game.business = createBusiness();
+    game.heatTimer = 0;
+    game.lastStrikes = 0;
     coast.time = 0; coast.tide = 0;
     game.stats = { carsStolen: 0, missionsDone: 0, kills: 0, explosions: 0, upgradesBought: 0, jobsDone: 0, racesWon: 0, spikesHit: 0 };
     game.traffic = spawnTraffic(rng, 22, player.x, player.z);
@@ -148,6 +167,11 @@ export function createGame(rng) {
     if (data.spikes) spikesLoad(game.police.spikes, data.spikes);
     // v5: restore the districts' clock (lighthouse beam, sailboats).
     if (data.districts) districtsLoad(game.districts, data.districts);
+    // v6: restore the weather and the business portfolio. A v5 save
+    // has neither, so every load is guarded — missing fields mean a
+    // clear evening and an empty portfolio.
+    if (data.weather) game.weather = weatherLoad(data.weather);
+    if (data.business) game.business = businessLoad(data.business);
     game.traffic = spawnTraffic(rng, 22, player.x, player.z);
     game.peds = spawnPedestrians(rng, 36, player.x, player.z);
     game.peds.push(...spawnCrew(rng, garageLandmark));
@@ -156,7 +180,16 @@ export function createGame(rng) {
 
   function startMission() {
     const m = currentMission(game.missions);
-    if (!m) { game.msg = 'All 12 missions complete — Vesper City and the coast are yours, Sunset King.'; return; }
+    if (!m) { game.msg = 'All 15 missions complete — Vesper City, the coast and the storm are yours, King of Vesper.'; return; }
+    // v6: the arc finale (mission 15) is gated — a level-2 business
+    // and 2,000 respect, or Dario will not hand Mara the crown.
+    if (m.id === 15) {
+      const gate = arcGateMet(game.business, game.respect.points);
+      if (!gate.ok) {
+        game.msg = 'King of Vesper needs more: ' + gate.missing.join(' and ') + '.';
+        return;
+      }
+    }
     if (game.missions.active) { game.msg = 'Mission already active: ' + m.title; return; }
     game.missions.active = true;
     game.missions.step = 0;
@@ -179,6 +212,32 @@ export function createGame(rng) {
     if (target) gpsSetTarget(game.gps, target);
     game.msg = `Side job: ${job.def.name} — ${job.def.blurb}. $${job.def.pay} on completion.`;
     return job;
+  }
+
+  // v6: buy or upgrade the nearest business (B). Near a FOR SALE
+  // board it buys; near a business Mara owns it upgrades one level.
+  // The cash leaves here, never inside the business module.
+  function buyBusiness() {
+    const near = nearestBusiness(game.business, player.x, player.z);
+    if (!near) { game.msg = 'No business nearby — follow the FOR SALE boards in the Marina, Old Town and the docks.'; return null; }
+    if (near.dist > 25) {
+      game.msg = `The ${near.name} is ${Math.round(near.dist)}m away — get closer to buy in.`;
+      return null;
+    }
+    const result = near.action === 'upgrade'
+      ? upgradeBusiness(game.business, near.id, game.cash)
+      : buyBiz(game.business, near.id, game.cash);
+    if (result.ok) {
+      game.cash -= result.cost;
+      const level = businessLevel(game.business, near.id);
+      const pts = businessRespect(level);
+      const gained = addRespect(game.respect, pts);
+      game.msg = result.msg + ` +${pts} respect for owning the city.`;
+      if (gained.rankUp) game.msg += ` Rank up: ${gained.rank.name}!`;
+    } else {
+      game.msg = result.msg;
+    }
+    return result;
   }
 
   // v4: toggle the GPS route line (L). Off means no gold trail and no
@@ -309,7 +368,7 @@ export function createGame(rng) {
       if (hit) { addWanted(game.police, 1); game.msg = 'You knocked a bystander down.'; }
       return;
     }
-    const hit = shoot(game.combat, player, game.peds.filter((p) => !p.crew), game.police.cops, game.time, game.traffic);
+    const hit = shoot(game.combat, player, game.peds.filter((p) => !p.crew), game.police.cops, game.time, game.traffic, game.weather.rain);
     if (!hit) return;
     if (hit.kind === 'dry') { game.msg = weapon.name + ' is empty — press 1 for fists or find ammo.'; return; }
     game.gunshot = true;
@@ -342,6 +401,30 @@ export function createGame(rng) {
     game.elapsed += dt;
     game.gunshot = false;
     if (game.ramTimer > 0) game.ramTimer -= dt;
+    // --- v6 weather: the day cycle advances, the storm front builds,
+    // and the businesses pay out when a new day dawns.
+    stepWeather(game.weather, dt, game.elapsed, 240, rng);
+    {
+      const pay = collectIncome(game.business, game.weather.day);
+      if (pay > 0) {
+        game.cash += pay;
+        game.msg = `Business income: +$${pay} for day ${game.weather.day}.`;
+      }
+    }
+    if (game.weather.strikes > (game.lastStrikes || 0)) {
+      game.lastStrikes = game.weather.strikes;
+      if (audio && audio.thunder) audio.thunder();
+    }
+    // --- v6 night heat: wanted rises faster after dark, and faster
+    // still in a storm — the VCPD owns the dark streets.
+    if (game.police.wanted > 0 && game.police.wanted < WANTED_MAX) {
+      game.heatTimer += dt * (wantedMultiplier(game.weather) - 1);
+      if (game.heatTimer > 30) {
+        game.heatTimer = 0;
+        addWanted(game.police, 1);
+        game.msg = 'The heat is rising — the VCPD is closing in.';
+      }
+    }
     const p = player;
     // --- radio: the station clock ticks and plays its next note ---
     const note = radioStep(game.radioState, dt);
@@ -413,19 +496,23 @@ export function createGame(rng) {
     }
     // --- world life ---
     for (const car of game.traffic) stepTraffic(car, dt, rng);
-    if (game.traffic.length < 14) {
+    // v6: a storm empties the roads — the traffic target halves, so
+    // the city feels abandoned when the front comes in.
+    if (game.traffic.length < Math.round(14 * trafficFactor(game.weather))) {
       const extra = spawnTraffic(rng, 2, p.x, p.z);
       game.traffic.push(...extra);
     }
     game.traffic = game.traffic.filter((c) => dist2(c.x, c.z, p.x, p.z) < 220 * 220);
-    stepPedestrians(game.peds, dt, p, game.traffic.concat(game.police.cops), game.gunshot, game.city.buildings);
+    stepPedestrians(game.peds, dt, p, game.traffic.concat(game.police.cops), game.gunshot, game.city.buildings, game.weather);
     if (game.peds.filter((x) => !x.dead).length < 18) {
       game.peds.push(...spawnPedestrians(rng, 4, p.x, p.z));
     }
     stepPolice(game.police, dt, p, rng, game.time);
     stepCombat(game.combat, dt, p, game.police);
     // --- v4 coast life: the tide breathes, boats bob, surfers paddle.
-    stepCoast(coast, dt, p);
+    // v6: the coast steps with the weather — the storm surge swells
+    // the tide and the boats pitch harder in the front.
+    stepCoast(coast, dt, p, game.weather);
     // v5: gulls cry over the marina and the coast, at most once
     // every eight seconds, so the sea sounds alive without spamming.
     if (isOnCoast(coast, p.x, p.z) && game.time - (game.lastGull || 0) > 8) {
@@ -433,14 +520,15 @@ export function createGame(rng) {
       if (audio && audio.gull) audio.gull();
     }
     // --- v5 districts life: sailboats cross the sea, the lighthouse
-    // beam turns, chimney smoke rises over Old Town.
-    stepDistricts(game.districts, dt);
+    // beam turns, chimney smoke rises over Old Town. v6: the sailboats
+    // reef their sails and slow down when the storm front arrives.
+    stepDistricts(game.districts, dt, game.weather);
     // --- v4 spike strips: check the player car and traffic against
     // live strips; a hit bursts the tyres and the HUD warns.
     {
       const stripCars = game.traffic.concat(game.police.cops);
       if (p.car) stripCars.push(p.car);
-      for (const ev of updateStrips(game.spikes, stripCars, game.time, dt)) {
+      for (const ev of updateStrips(game.spikes, stripCars, game.time, dt, game.weather)) {
         game.stats.spikesHit += 1;
         if (ev.car === p.car) {
           game.msg = 'SPIKE STRIP! Your tyres are blown — limp to the Sunset Garage, Rook patches them free.';
@@ -484,6 +572,9 @@ export function createGame(rng) {
       game.stats.missionsDone += 1;
       const gained = addRespect(game.respect, done.respect || RESPECT_POINTS.mission);
       game.msg = `Mission complete: ${done.title} — earned $${reward}! +${done.respect || RESPECT_POINTS.mission} respect.`;
+      // v6: the arc missions carry an outro — the story payoff line,
+      // shown right after the reward so the ending lands.
+      if (done.outro) game.msg += ` ${done.outro}`;
       if (gained.rankUp) game.msg += ` Rank up: ${gained.rank.name}! ${gained.joined.map((c) => c.name + ' joined the crew!').join(' ')}`;
       if (audio) audio.chime();
       // v4 finale: mission 12 pays a crown bonus on top, once, and the
@@ -491,6 +582,15 @@ export function createGame(rng) {
       if (done.id === 12) {
         game.cash += FINALE_BONUS;
         game.msg += ` FINALE BONUS +$${FINALE_BONUS} — you are the King of the Sunset!`;
+        const fg = addRespect(game.respect, RESPECT_POINTS.finale);
+        if (fg.rankUp) game.msg += ` Rank up: ${fg.rank.name}!`;
+      }
+      // v6 arc finale: mission 15 pays a bigger crown bonus, once, and
+      // the whole city — streets, coast, Marina, Old Town and the storm
+      // itself — is declared won.
+      if (done.id === 15) {
+        game.cash += ARC_FINALE_BONUS;
+        game.msg += ` ARC FINALE BONUS +$${ARC_FINALE_BONUS} — you are the King of Vesper!`;
         const fg = addRespect(game.respect, RESPECT_POINTS.finale);
         if (fg.rankUp) game.msg += ` Rank up: ${fg.rank.name}!`;
       }
@@ -505,7 +605,7 @@ export function createGame(rng) {
       autosave(game, game.saveSlots);
     }
     // --- v4 side jobs: pickup, checkpoint, payout, expiry.
-    for (const ev of updateJob(game.jobs, p.x, p.z, dt, game.elapsed)) {
+    for (const ev of updateJob(game.jobs, p.x, p.z, dt, game.elapsed, game.weather)) {
       if (ev.type === 'pickup') {
         game.msg = ev.job.type === 'taxi' ? 'Fare picked up — drive them to the docks.' : 'Parcel collected — deliver it before the timer runs out.';
         if (audio && audio.horn) audio.horn();
@@ -522,6 +622,7 @@ export function createGame(rng) {
         if (ev.job.type === 'race') game.stats.racesWon += 1;
         const gained = addRespect(game.respect, ev.respect);
         game.msg = `Job done: ${ev.job.def.name} — earned $${pay}! +${ev.respect} respect.`;
+        if (ev.stormBonus) game.msg += ' Storm pay: 25% extra for driving in the front!';
         if (ev.parBonus) game.msg += ` Beat par time: +$${ev.parBonus} bonus!`;
         if (ev.time) game.msg += ` (${Math.round(ev.time)}s)`;
         if (gained.rankUp) game.msg += ` Rank up: ${gained.rank.name}!`;
@@ -569,7 +670,9 @@ export function createGame(rng) {
         game.msg = `Day ${ev.day} dawns — the Sun Coins are hidden again.`;
       }
     }
-    game.rain = clamp(0.12 + (game.elapsed / (WORLD.dayLength * WORLD.stormDays)) * 0.1, 0.12, 0.25);
+    // v6: the rain level is the weather's now, not a fixed drift — the
+    // drizzle overlay and the audio follow the storm, not the clock.
+    game.rain = game.weather.rain;
     if (p.health <= 0) {
       game.screen = SCREEN_DEAD;
       game.cash = Math.max(0, game.cash - 200);
@@ -632,6 +735,10 @@ export function createGame(rng) {
     // (clouds, birds, sea glints) on top of everything else.
     boxes.push(...districtBoxes(game.districts, time));
     boxes.push(...visualsBoxes(game, time));
+    // v6: storm clouds, lightning and wet-road glints, plus the gold
+    // signs over Mara's businesses and FOR SALE boards over the rest.
+    boxes.push(...weatherBoxes(game.weather, time, p.x, p.z));
+    boxes.push(...businessBoxes(game.business, time));
     if (game.combat.muzzle > 0) {
       const mw = game.combat.lastWeapon === 'shotgun' ? 1.1 : 0.6;
       boxes.push({ x: p.x + Math.sin(p.angle) * 1.2, y: 1.0, z: p.z + Math.cos(p.angle) * 1.2, w: mw, h: mw, d: mw, color: muzzleColor(game.combat.lastWeapon), yaw: 0 });
@@ -704,6 +811,20 @@ export function createGame(rng) {
       slots: listSlots(),
       activeSlot: game.saveSlots.active,
       slotLabel: slotLabel(game.saveSlots),
+      // v6 HUD state: the weather chip and the business portfolio.
+      weather: {
+        phase: game.weather.phase,
+        label: weatherLabel(game.weather),
+        rain: game.weather.rain,
+        day: game.weather.day,
+        strikes: game.weather.strikes,
+        stormFront: game.weather.stormFront,
+        forecast: weatherForecastText(game.weather),
+      },
+      business: { ...businessSummary(game.business), hint: nextUpgradeHint(game.business) },
+      businessLabel: businessSummary(game.business).owned > 0
+        ? `${businessSummary(game.business).owned}/6 businesses · $${businessSummary(game.business).incomePerDay}/day`
+        : 'No businesses — press B near a FOR SALE board',
       objective: game.missions.active && m && step ? {
         title: m.title,
         text: step.text,
@@ -732,5 +853,7 @@ export function createGame(rng) {
     // v4: side jobs, GPS, save slots, weapon wheel.
     startSideJob, toggleGps, cycleSaveSlot,
     openWheel: openWheelUi, closeWheel: closeWheelUi, wheelHover,
+    // v6: businesses — buy or upgrade the nearest one (B key).
+    buyBusiness,
   };
 }

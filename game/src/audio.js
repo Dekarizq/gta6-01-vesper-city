@@ -143,6 +143,20 @@ export function createAudio() {
     // v4: wheel tick, race countdown beep, taxi horn, spike hiss.
     // v5: a seagull cry over the marina and the coast — two falling
     // notes, quiet, so it never fights the radio.
+    // v6: thunder for the lightning strikes — a low rolling rumble
+    // that starts loud and fades over two seconds.
+    thunder() {
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      const src = ctx.createBufferSource();
+      const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < d.length; i += 1) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 1.5);
+      src.buffer = b;
+      const filt = ctx.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 160;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.01, t + 2);
+      src.connect(filt); filt.connect(g); g.connect(master); src.start();
+    },
     gull() { blip(1900, 0.28, 0.05, 'sine'); setTimeout(() => blip(1500, 0.32, 0.04, 'sine'), 160); },
     wheelTick() { blip(1200, 0.07, 0.12, 'square'); },
     raceBeep(final) { blip(final ? 1320 : 880, final ? 0.35 : 0.15, 0.2, 'sine'); },

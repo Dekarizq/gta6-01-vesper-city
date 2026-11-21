@@ -7,6 +7,8 @@
 // weapon wheel (hold >350ms, release to lock in the picked weapon), J start
 // the next side job (taxi / delivery / street race, cycling), L toggle the
 // GPS route line, K cycle save slots, M map, U mute, P pause.
+// v6: B buys or upgrades the nearest business (press B near a FOR
+// SALE board), so owning the city is one key away.
 export const ACT_ENTER = 1;
 export const ACT_SHOOT = 2;
 export const ACT_PAUSE = 4;
@@ -26,13 +28,14 @@ export const ACT_JOB = 16384;
 export const ACT_GPS = 32768;
 export const ACT_SLOT = 65536;
 export const ACT_HUD = 131072; // v5: H hides the HUD for a clean screenshot
+export const ACT_BUSINESS = 262144; // v6: B buys/upgrades the nearest business
 // Wheel: hold Q longer than this (ms) and it is a wheel hold, not a tap.
 export const WHEEL_HOLD_MS = 350;
 
 const KEYMAP = {
   KeyE: ACT_ENTER, KeyF: ACT_SHOOT, KeyP: ACT_PAUSE, KeyM: ACT_MAP,
   KeyT: ACT_RESTART, KeyU: ACT_MUTE, KeyG: ACT_GARAGE, KeyR: ACT_RADIO,
-  KeyJ: ACT_JOB, KeyL: ACT_GPS, KeyK: ACT_SLOT, KeyH: ACT_HUD,
+  KeyJ: ACT_JOB, KeyL: ACT_GPS, KeyK: ACT_SLOT, KeyH: ACT_HUD, KeyB: ACT_BUSINESS,
   Space: ACT_CONFIRM, Enter: ACT_CONFIRM,
 };
 // Q is NOT in KEYMAP: it is handled specially (tap = mission, hold = wheel).

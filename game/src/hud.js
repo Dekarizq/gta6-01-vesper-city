@@ -1,4 +1,4 @@
-// hud.js — the DOM HUD for Sunset Kings (v4), dense like the rank 1-2
+// hud.js — the DOM HUD for Sunset Kings (v6), dense like the rank 1-2
 // entries: big cash, health + armour bars, wanted stars, four weapon
 // slots with ammo, storm countdown, district + radio, a mission card
 // with progress, a live VCPD pursuit panel with named officers and
@@ -8,6 +8,9 @@
 // shop panel with upgrade levels and prices. v4 adds the weapon wheel
 // overlay (hold Q), a side-job card with its timer, a GPS chip with the
 // next turn, a coast chip, a spike-strip warning, and the save-slot line.
+// v6 adds a weather chip (phase, rain, lightning strikes) and a
+// business panel (portfolio, daily income, what the nearest property
+// costs) — the city Mara owns is on screen, not just in the save.
 // The gameplay panels hide on the title screen. Also the start screen,
 // pause menu, map overlay and drizzle overlay canvas.
 import { WANTED_MAX } from './config.js';
@@ -32,13 +35,15 @@ export function createHud(city) {
     <div id="hud-jobs" class="hud-panel"></div>
     <div id="hud-gps" class="hud-panel"></div>
     <div id="hud-coast" class="hud-panel"></div>
+    <div id="hud-weather" class="hud-panel"></div>
+    <div id="hud-business" class="hud-panel"></div>
     <div id="hud-slots" class="hud-panel"></div>
     <div id="weapon-wheel" class="hud-panel"></div>
     <div id="hud-dialog" class="hud-panel"><div id="hud-portrait">D</div><div id="hud-dialog-text"></div></div>
     <div id="hud-objective" class="hud-panel"></div>
     <div id="hud-speedo" class="hud-panel"><div id="hud-speed">0</div><div id="hud-speed-unit">KM/H</div><div id="hud-speed-car"></div></div>
     <div id="hud-msg" class="hud-panel"></div>
-    <div id="hud-help" class="hud-panel">WASD drive / walk &nbsp;·&nbsp; E steal car &nbsp;·&nbsp; F / click shoot &nbsp;·&nbsp; 1/2/3/4 weapons &nbsp;·&nbsp; HOLD Q wheel / TAP Q mission &nbsp;·&nbsp; G garage &nbsp;·&nbsp; R radio &nbsp;·&nbsp; J side job &nbsp;·&nbsp; L GPS &nbsp;·&nbsp; K save slot &nbsp;·&nbsp; Space handbrake &nbsp;·&nbsp; Shift sprint &nbsp;·&nbsp; T restart &nbsp;·&nbsp; M map &nbsp;·&nbsp; P pause</div>
+    <div id="hud-help" class="hud-panel">WASD drive / walk &nbsp;·&nbsp; E steal car &nbsp;·&nbsp; F / click shoot &nbsp;·&nbsp; 1/2/3/4 weapons &nbsp;·&nbsp; HOLD Q wheel / TAP Q mission &nbsp;·&nbsp; G garage &nbsp;·&nbsp; R radio &nbsp;·&nbsp; J side job &nbsp;·&nbsp; L GPS &nbsp;·&nbsp; K save slot &nbsp;·&nbsp; B buy business &nbsp;·&nbsp; Space handbrake &nbsp;·&nbsp; Shift sprint &nbsp;·&nbsp; T restart &nbsp;·&nbsp; M map &nbsp;·&nbsp; P pause</div>
     <canvas id="minimap" class="hud-panel" width="190" height="190"></canvas>
     <div id="map-overlay"><div id="map-title">VESPER CITY — SUNSET KINGS · 7 DAYS TO THE STORM</div><canvas id="bigmap" width="640" height="640"></canvas><div id="map-hint">Press M to close</div></div>
     <div id="title-screen">
@@ -46,14 +51,14 @@ export function createHud(city) {
         <div id="title-kicker">A SUN-SOAKED OPEN WORLD · GOLDEN HOUR BEFORE THE HURRICANE · SUNSET KINGS</div>
         <h1 id="title-name">VESPER CITY<br><span>GOLDEN HOUR</span><br><span class="title-kings">— SUNSET KINGS —</span></h1>
         <p id="title-story">Mara Voss, getaway driver. One week before Hurricane Ilsa drowns the city, the morning rain
-        has cleared and the whole coast is gold. Fixer Dario Kess offers her one last way out — twelve jobs, twelve sunsets, no way back.
-        Build respect, gather your crew, tune your car at the Sunset Garage, hold the beach against the Tide Kings, and become the Sunset King.</p>
+        has cleared and the whole coast is gold. Fixer Dario Kess offers her one last way out — fifteen jobs, fifteen sunsets, no way back.
+        Build respect, gather your crew, tune your car at the Sunset Garage, buy the businesses that pay you back, hold the beach against the Tide Kings through the storm itself, and become the King of Vesper.</p>
         <div id="title-controls">WASD / Arrows — drive &amp; walk &nbsp;·&nbsp; E — steal car &nbsp;·&nbsp; F / click — shoot<br>
         1 / 2 / 3 / 4 — switch weapon &nbsp;·&nbsp; HOLD Q — weapon wheel &nbsp;·&nbsp; TAP Q — start mission &nbsp;·&nbsp; G — Sunset Garage &nbsp;·&nbsp; R — radio station<br>
-        J — side job (taxi / delivery / race) &nbsp;·&nbsp; L — GPS route &nbsp;·&nbsp; K — save slot &nbsp;·&nbsp; Space — handbrake &nbsp;·&nbsp; Shift — sprint &nbsp;·&nbsp; T — restart mission &nbsp;·&nbsp; M — map &nbsp;·&nbsp; P — pause</div>
+        J — side job (taxi / delivery / race) &nbsp;·&nbsp; L — GPS route &nbsp;·&nbsp; K — save slot &nbsp;·&nbsp; B — buy business &nbsp;·&nbsp; Space — handbrake &nbsp;·&nbsp; Shift — sprint &nbsp;·&nbsp; T — restart mission &nbsp;·&nbsp; M — map &nbsp;·&nbsp; P — pause</div>
         <button id="start-btn">START ENGINE</button>
         <button id="continue-btn">CONTINUE SAVED GAME</button>
-        <div id="title-foot">12 story missions · 11 car types · Sunset Garage upgrades incl. NITRO &amp; CHROME · 5 radio stations · respect ranks &amp; crew · wanted 0–6 · spike strips · named VCPD units, roadblocks &amp; CONDOR-1 helicopter · cars that burn &amp; explode · Sunset Beach coast with pier, boats &amp; side jobs · Marina District &amp; Old Town · GPS route · 3 save slots</div>
+        <div id="title-foot">15 story missions · 11 car types · Sunset Garage upgrades incl. NITRO &amp; CHROME · 6 radio stations · respect ranks &amp; crew · wanted 0–6 · spike strips · named VCPD units, roadblocks &amp; CONDOR-1 helicopter · cars that burn &amp; explode · Sunset Beach coast with pier, boats &amp; side jobs · Marina District &amp; Old Town · day cycle, rain &amp; lightning · 6 buyable businesses · GPS route · 3 save slots</div>
       </div>
     </div>
     <div id="pause-screen"><h2>PAUSED</h2><p>WASD drive · E steal car · F shoot · 1/2/3 weapons · G garage · R radio · Q mission · T restart mission · U mute</p>
@@ -282,6 +287,25 @@ export function createHud(city) {
         $('hud-coast').style.display = 'block';
       } else {
         $('hud-coast').style.display = 'none';
+      }
+      // v6: weather chip — the phase, the rain, how many times the
+      // lightning has struck, and tomorrow's forecast, so the storm
+      // is always in view and never a surprise.
+      if (state.weather) {
+        const w = state.weather;
+        $('hud-weather').textContent = `🌩 ${w.label || ''}${w.strikes > 0 ? ` · ⚡ ${w.strikes} strike${w.strikes === 1 ? '' : 's'}` : ''}${w.forecast ? ` · ${w.forecast}` : ''}`;
+        $('hud-weather').style.display = 'block';
+      }
+      // v6: business panel — the portfolio, the daily take, and what
+      // Mara owns, so the city she is buying stays on screen.
+      if (state.business) {
+        const b = state.business;
+        $('hud-business').innerHTML = '<div class="vcpd-head">🏪 BUSINESSES — press B near a FOR SALE board</div>'
+          + `<div class="vcpd-row"><span>Owned</span><span>${b.owned}/${b.total} · $${b.incomePerDay}/day</span></div>`
+          + `<div class="vcpd-row"><span>Passive income earned</span><span>$${b.earned.toLocaleString()}</span></div>`
+          + (b.list || []).map((x) => `<div class="vcpd-row"><span>${x.name}</span><span>Lv${x.level} · $${x.income}/day</span></div>`).join('')
+          + (b.hint ? `<div class="vcpd-row"><span>${b.hint}</span></div>` : '');
+        $('hud-business').style.display = 'block';
       }
       // v4: save-slot line — which slot is active, and what it holds.
       if (state.slots) {

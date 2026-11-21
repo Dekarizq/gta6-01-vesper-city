@@ -4,7 +4,14 @@
 [![rank](https://make.fun/badge/gta6-01/Dekarizq/gta6-01-vesper-city/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 [![reward](https://make.fun/badge/gta6-01/Dekarizq/gta6-01-vesper-city/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
-Vesper City: Golden Hour — Sunset Kings v5 — a sun-soaked open-world crime game in the spirit of GTA 6, built for make.fun's "Make GTA 6" bounty ($1,666 in USDC). Play as Mara Voss, getaway driver, through 12 story missions in a golden-hour coastal city under a 7-day hurricane countdown: drive and steal cars, outrun the police (wanted level 0-6, roadblocks, spike strips, the CONDOR-1 helicopter with a searchlight, and named VCPD units with RAM / PIT / PURSUIT / SPIKE / BLOCKADE tactics), fight on foot with four weapons (FISTS, VESPER 9MM, MAKO SMG, GOLDEN 12-GAUGE shotgun on a hold-Q weapon wheel), work side jobs on the Sunset Beach coast, and follow the GPS route line on the dense HUD and circular minimap. Raw WebGL, no libraries, no network requests — fully offline static files.
+Vesper City: Golden Hour — Sunset Kings v6 — a sun-soaked open-world crime game in the spirit of GTA 6, built for make.fun's "Make GTA 6" bounty ($1,666 in USDC). Play as Mara Voss, getaway driver, through 15 story missions in a golden-hour coastal city under a 7-day hurricane countdown: drive and steal cars, outrun the police (wanted level 0-6, roadblocks, spike strips, the CONDOR-1 helicopter with a searchlight, and named VCPD units with RAM / PIT / PURSUIT / SPIKE / BLOCKADE / STORM tactics), fight on foot with four weapons (FISTS, VESPER 9MM, MAKO SMG, GOLDEN 12-GAUGE shotgun on a hold-Q weapon wheel), work side jobs on the Sunset Beach coast, buy businesses and earn passive income, and follow the GPS route line on the dense HUD and circular minimap. Raw WebGL, no libraries, no network requests — fully offline static files.
+
+## Sunset Kings v6 — what v6 adds
+
+- **Storm weather system**: a real day–night cycle with a 7-day hurricane countdown. The sky darkens as the front rolls in — storm rain, lightning strikes, wet reflective roads, storm drains and sandbag stacks along the harbour. Traffic thins in the storm, wanted rises faster at night, side jobs pay 25% hazard pay in the front, and the 2D rain overlay tracks the same storm.
+- **Business empire (B)**: buy six properties — the Marina fish market, the Old Town night bar, a surf shop, a cafe, a warehouse and a market stall — with real cash. Each pays passive income every game day, upgrades to level 3, and shows in the HUD and the save file. The new Storm Chaser 4x4 and a HURRICANE 88.8 radio station round out the storm kit.
+- **Missions 13–15, the Marina arc**: "Storm Warning" secures the Marina before the front hits, "Night Market" runs the Old Town lanes after dark, and "King of Vesper" is the finale — it only opens once you own a level-2 business and hold 2,000 respect, and pays a $2,000 crown bonus. 15 missions total, 42 Sun Coins, 6 radio stations.
+- **Rebuilt engine and city**: the WebGL renderer and the city generator were rewritten from scratch — softer shadows, warmer fog, distance culling for buildings off-camera, and a new `nearestLandmark` lookup for mission staging.
 
 ## Sunset Kings v5 — what v5 adds
 
@@ -34,7 +41,7 @@ Vesper City: Golden Hour — Sunset Kings v5 — a sun-soaked open-world crime g
 
 ## Sun Coins — the golden-hour side hunt
 
-24 golden Sun Coins hide at named crossings across the city, from Sunset Mile to Surfer's corner. Drive or walk over one to pocket it — the HUD chip counts them (☀ SUN COINS n/24), and the nearest one is always a short drive away. Grab coins quickly to build a Sun Streak: every 6th chained coin pays a $50 streak bonus. Collect all 24 in one in-game day and Dario pays a $500 bonus. At dawn the coins are hidden again, so the hunt resets every morning. Progress saves with the game.
+42 golden Sun Coins hide at named crossings across the city, from Sunset Mile to the Flood wall. Drive or walk over one to pocket it — the HUD chip counts them (☀ SUN COINS n/42), and the nearest one is always a short drive away. Grab coins quickly to build a Sun Streak: every 6th chained coin pays a $50 streak bonus. Collect all 42 in one in-game day and Dario pays a $500 bonus. At dawn the coins are hidden again, so the hunt resets every morning. Progress saves with the game.
 
 ## Run it
 
@@ -42,7 +49,7 @@ Vesper City: Golden Hour — Sunset Kings v5 — a sun-soaked open-world crime g
 node serve.ts
 ```
 
-Then open http://localhost:8080 in desktop Chrome. Controls: WASD/arrows drive & walk, E steal car, F/click shoot, 1/2/3/4 switch weapon, hold Q weapon wheel / tap Q mission, G Sunset Garage, R radio station (4 stations), J side job, L GPS route, K save slot, Space handbrake, Shift sprint/boost, T restart mission, M map, P pause, U mute.
+Then open http://localhost:8080 in desktop Chrome. Controls: WASD/arrows drive & walk, E steal car, F/click shoot, 1/2/3/4 switch weapon, hold Q weapon wheel / tap Q mission, G Sunset Garage, B buy/upgrade business, R radio station (6 stations), J side job, L GPS route, K save slot, Space handbrake, Shift sprint/boost, T restart mission, M map, P pause, U mute, H hide HUD.
 
 ---
 

@@ -137,10 +137,13 @@ export function wheelSlots(wheel, combat) {
 }
 
 // One-line label for the HUD: the picked weapon and its ammo.
-export function wheelLabel(wheel, combat) {
+// v6: in a storm the label says so — the wheel is the same, but the
+// rain is coming down on it.
+export function wheelLabel(wheel, combat, weather) {
   const w = WEAPONS[wheel.selected] || WEAPONS[1];
   const ammo = combat ? combat.ammo[wheel.selected] : w.ammo;
-  return `${w.name} · ${ammo === Infinity ? '∞' : ammo} rounds`;
+  const storm = weather && weather.phase === 'storm' ? ' · IN THE STORM' : '';
+  return `${w.name} · ${ammo === Infinity ? '∞' : ammo} rounds${storm}`;
 }
 
 // The wheel's own render boxes: a gold ring marker floating over

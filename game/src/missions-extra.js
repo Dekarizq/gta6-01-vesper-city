@@ -46,9 +46,10 @@ export function buildExtraMissions(coast) {
   ];
 }
 
-// How many story missions the game has in total (10 from v3 + 2 here).
+// How many story missions the game has in total (10 from v3 + 2 here
+// + 3 from the v6 arc in missions-arc.js = 15).
 export const EXTRA_MISSION_COUNT = 2;
-export const TOTAL_MISSIONS = 12;
+export const TOTAL_MISSIONS = 15;
 
 // The finale's own reward: finishing mission 12 pays a crown bonus on
 // top of the mission reward, once, in the world loop.
