@@ -1,11 +1,17 @@
-// hud.js — the DOM HUD, dense like the rank 1-2 entries: big cash, health +
-// armour bars, wanted stars, three weapon slots with ammo, storm countdown,
-// district + radio, a mission card with progress, a live VCPD pursuit panel,
-// a dialog box with a portrait, a big speedometer with car name/condition,
-// and a circular minimap. The gameplay panels hide on the title screen.
-// Also the start screen, pause menu, map overlay and drizzle overlay canvas.
+// hud.js — the DOM HUD for Sunset Kings (v3), dense like the rank 1-2
+// entries: big cash, health + armour bars, wanted stars, three weapon
+// slots with ammo, storm countdown, district + radio, a mission card
+// with progress, a live VCPD pursuit panel with named officers and
+// tactics, a dialog box with a portrait, a big speedometer with car
+// name/condition, a circular minimap — and new in v3: a respect bar
+// with Mara's rank, the crew who have joined, and the Sunset Garage
+// shop panel with upgrade levels and prices. The gameplay panels hide
+// on the title screen. Also the start screen, pause menu, map overlay
+// and drizzle overlay canvas.
 import { WANTED_MAX } from './config.js';
 import { districtAt } from './city.js';
+import { respectRank, nextRank } from './respect.js';
+import { GARAGE_UPGRADES } from './garage.js';
 
 export function createHud(city) {
   const root = document.getElementById('hud');
@@ -13,33 +19,36 @@ export function createHud(city) {
     <div id="hud-top-left" class="hud-panel"><div id="hud-cash">$0</div>
       <div id="hud-health"><div id="hud-health-fill"></div></div>
       <div id="hud-armour"><div id="hud-armour-fill"></div></div>
-      <div id="hud-car"></div><div id="hud-coins"></div></div>
+      <div id="hud-car"></div><div id="hud-coins"></div>
+      <div id="hud-respect"></div><div id="hud-crew"></div></div>
     <div id="hud-top-right" class="hud-panel"><div id="hud-wanted-label">WANTED</div><div id="hud-stars"></div>
       <div id="hud-weapons"></div>
       <div id="hud-storm"></div><div id="hud-district"></div><div id="hud-radio"></div></div>
     <div id="hud-mission" class="hud-panel"></div>
     <div id="hud-vcpd" class="hud-panel"></div>
+    <div id="hud-garage" class="hud-panel"></div>
     <div id="hud-dialog" class="hud-panel"><div id="hud-portrait">D</div><div id="hud-dialog-text"></div></div>
     <div id="hud-objective" class="hud-panel"></div>
     <div id="hud-speedo" class="hud-panel"><div id="hud-speed">0</div><div id="hud-speed-unit">KM/H</div><div id="hud-speed-car"></div></div>
     <div id="hud-msg" class="hud-panel"></div>
-    <div id="hud-help" class="hud-panel">WASD drive / walk &nbsp;·&nbsp; E enter car &nbsp;·&nbsp; F / click shoot &nbsp;·&nbsp; 1/2/3 weapons &nbsp;·&nbsp; Space handbrake &nbsp;·&nbsp; Shift sprint &nbsp;·&nbsp; Q mission &nbsp;·&nbsp; M map &nbsp;·&nbsp; P pause</div>
+    <div id="hud-help" class="hud-panel">WASD drive / walk &nbsp;·&nbsp; E steal car &nbsp;·&nbsp; F / click shoot &nbsp;·&nbsp; 1/2/3 weapons &nbsp;·&nbsp; G garage &nbsp;·&nbsp; R radio &nbsp;·&nbsp; Space handbrake &nbsp;·&nbsp; Shift sprint &nbsp;·&nbsp; Q mission &nbsp;·&nbsp; T restart &nbsp;·&nbsp; M map &nbsp;·&nbsp; P pause</div>
     <canvas id="minimap" class="hud-panel" width="190" height="190"></canvas>
-    <div id="map-overlay"><div id="map-title">VESPER CITY — 7 DAYS TO THE STORM</div><canvas id="bigmap" width="640" height="640"></canvas><div id="map-hint">Press M to close</div></div>
+    <div id="map-overlay"><div id="map-title">VESPER CITY — SUNSET KINGS · 7 DAYS TO THE STORM</div><canvas id="bigmap" width="640" height="640"></canvas><div id="map-hint">Press M to close</div></div>
     <div id="title-screen">
       <div id="title-inner">
-        <div id="title-kicker">A SUN-SOAKED OPEN WORLD · GOLDEN HOUR BEFORE THE HURRICANE</div>
-        <h1 id="title-name">VESPER CITY<br><span>GOLDEN HOUR</span></h1>
+        <div id="title-kicker">A SUN-SOAKED OPEN WORLD · GOLDEN HOUR BEFORE THE HURRICANE · SUNSET KINGS</div>
+        <h1 id="title-name">VESPER CITY<br><span>GOLDEN HOUR</span><br><span class="title-kings">— SUNSET KINGS —</span></h1>
         <p id="title-story">Mara Voss, getaway driver. One week before Hurricane Ilsa drowns the city, the morning rain
-        has cleared and the whole coast is gold. Fixer Dario Kess offers her one last way out — ten jobs, ten sunsets, no way back.</p>
-        <div id="title-controls">WASD / Arrows — drive &amp; walk &nbsp;·&nbsp; E — enter / steal car &nbsp;·&nbsp; F / click — shoot<br>
-        1 / 2 / 3 — switch weapon &nbsp;·&nbsp; Space — handbrake &nbsp;·&nbsp; Shift — sprint / boost &nbsp;·&nbsp; Q — start mission &nbsp;·&nbsp; M — map &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; R — restart mission</div>
+        has cleared and the whole coast is gold. Fixer Dario Kess offers her one last way out — ten jobs, ten sunsets, no way back.
+        Build respect, gather your crew, tune your car at the Sunset Garage, and become the Sunset King.</p>
+        <div id="title-controls">WASD / Arrows — drive &amp; walk &nbsp;·&nbsp; E — steal car &nbsp;·&nbsp; F / click — shoot<br>
+        1 / 2 / 3 — switch weapon &nbsp;·&nbsp; G — Sunset Garage &nbsp;·&nbsp; R — radio station &nbsp;·&nbsp; Space — handbrake &nbsp;·&nbsp; Shift — sprint &nbsp;·&nbsp; Q — start mission &nbsp;·&nbsp; T — restart mission &nbsp;·&nbsp; M — map &nbsp;·&nbsp; P — pause</div>
         <button id="start-btn">START ENGINE</button>
         <button id="continue-btn">CONTINUE SAVED GAME</button>
-        <div id="title-foot">10 story missions · 4 car types · wanted level 0–5 · police chases, roadblocks &amp; helicopter · save in your browser</div>
+        <div id="title-foot">10 story missions · 5 car types · Sunset Garage upgrades · 3 radio stations · respect ranks &amp; crew · wanted 0–5 · named VCPD units, roadblocks &amp; CONDOR-1 helicopter · cars that burn &amp; explode · save in your browser</div>
       </div>
     </div>
-    <div id="pause-screen"><h2>PAUSED</h2><p>WASD drive · E enter car · F shoot · 1/2/3 weapons · Q mission · R restart mission · U mute</p>
+    <div id="pause-screen"><h2>PAUSED</h2><p>WASD drive · E steal car · F shoot · 1/2/3 weapons · G garage · R radio · Q mission · T restart mission · U mute</p>
     <button id="resume-btn">RESUME</button> <button id="save-btn">SAVE GAME</button> <button id="quit-btn">QUIT TO TITLE</button></div>
     <div id="dead-screen"><h2>BUSTED / DOWN</h2><p id="dead-text">Mara wakes up at St. Mara Hospital. The rain has cleared — the coast is gold.</p><button id="respawn-btn">GET BACK UP</button></div>
     <div id="vignette"></div>`;
@@ -51,7 +60,7 @@ export function createHud(city) {
   const drops = [];
   for (let i = 0; i < 80; i += 1) drops.push({ x: Math.random(), y: Math.random(), s: 0.4 + Math.random() * 0.6 });
   let msgTimer = 0;
-  let lastCash = -1, lastStars = -1, lastWeapons = '', lastCoins = '';
+  let lastCash = -1, lastStars = -1, lastWeapons = '', lastCoins = '', lastRespect = '';
 
   function fmtCash(v) { return '$' + Math.floor(v).toLocaleString('en-US'); }
 
@@ -66,7 +75,7 @@ export function createHud(city) {
       ctx.beginPath(); ctx.moveTo(0, bz); ctx.lineTo(size, bz); ctx.stroke();
     }
     ctx.fillStyle = 'rgba(240,120,50,0.5)';
-    ctx.fillRect(0, size * 0.94, size, size * 0.06); // harbor water at sunset
+    ctx.fillRect(0, size * 0.94, size, size * 0.06);
     for (const b of city.buildings) {
       const [bx, bz] = toMap(b.x, b.z);
       ctx.fillStyle = '#6b4a2a';
@@ -74,7 +83,7 @@ export function createHud(city) {
     }
     for (const l of city.landmarks) {
       const [lx, lz] = toMap(l.x, l.z);
-      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(lx, lz, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = l.id === 'garage' ? '#ffd166' : '#ffd166'; ctx.beginPath(); ctx.arc(lx, lz, l.id === 'garage' ? 5 : 3, 0, Math.PI * 2); ctx.fill();
     }
     const step = state.missionStep;
     if (step) {
@@ -139,6 +148,19 @@ export function createHud(city) {
         $('hud-coins').textContent = state.coins ? `☀ SUN COINS ${cKey}` : '';
         lastCoins = cKey;
       }
+      // Respect bar + rank, and the crew who have joined.
+      const rp = state.respectPoints || 0;
+      const rank = respectRank(rp);
+      const nxt = nextRank(rp);
+      const rKey = `${rp}:${rank.name}:${(state.crew || []).join(',')}`;
+      if (rKey !== lastRespect) {
+        const pct = nxt ? Math.round(((rp - rank.min) / (nxt.min - rank.min)) * 100) : 100;
+        $('hud-respect').innerHTML = `👑 ${rank.name} · ${rp} RESPECT` + (nxt ? ` · next ${nxt.name} ${pct}%` : ' · MAX RANK');
+        $('hud-crew').textContent = (state.crew && state.crew.length > 0)
+          ? 'CREW: ' + state.crew.join(' · ')
+          : 'CREW: Mara alone — earn respect to recruit Lena, Rook, Dario';
+        lastRespect = rKey;
+      }
       if (state.wanted !== lastStars) {
         $('hud-stars').innerHTML = Array.from({ length: WANTED_MAX }, (_, i) =>
           `<span class="star ${i < state.wanted ? 'on' : ''}">★</span>`).join('');
@@ -155,30 +177,40 @@ export function createHud(city) {
       $('hud-storm').textContent = `⛈ HURRICANE IN ${left} DAY${left === 1 ? '' : 'S'} · DAY ${day}/7 · 18:48`;
       $('hud-district').textContent = districtAt(state.x, state.z).name + ' · Vesper City';
       $('hud-radio').textContent = '♪ ' + (state.radio || '');
-      // Mission card: title, progress bar, stage + NEXT distance.
       const m = state.objective;
       if (m) {
         const total = state.missionTotal || 10;
-        $('hud-mission').innerHTML = `<div class="mission-kicker">MISSION ${state.missionIndex + 1}/${total} · GOLDEN HOUR</div>
+        $('hud-mission').innerHTML = `<div class="mission-kicker">MISSION ${state.missionIndex + 1}/${total} · SUNSET KINGS</div>
           <div class="mission-title">${m.title}</div>
           <div class="mission-bar"><div class="mission-fill" style="width:${Math.round(100 / total)}%"></div></div>
           <div class="mission-stage">STAGE — ${m.text}</div>
           <div class="mission-next">NEXT ${Math.round(m.dist)}m</div>`;
         $('hud-mission').style.display = 'block';
       } else {
-        $('hud-mission').innerHTML = '<div class="mission-kicker">FREE ROAM</div><div class="mission-stage">Press Q to start the next story mission</div>';
+        $('hud-mission').innerHTML = '<div class="mission-kicker">FREE ROAM · SUNSET KINGS</div><div class="mission-stage">Press Q to start the next story mission</div>';
       }
-      // VCPD pursuit panel: one row per cruiser, callsign + status + distance.
+      // VCPD pursuit panel: named officer, tactic, status, distance.
       const cops = state.cops || [];
       if (cops.length > 0) {
-        $('hud-vcpd').innerHTML = `<div class="vcpd-head">● VCPD RESPONSE &nbsp; ${cops.length} UNIT${cops.length === 1 ? '' : 'S'}${state.heliUp ? ' · AIR UNIT DEPLOYED' : ''}</div>`
-          + cops.map((c) => `<div class="vcpd-row"><span>${c.callsign}</span><span class="vcpd-status">${c.status}</span><span>${c.dist}m</span></div>`).join('')
+        $('hud-vcpd').innerHTML = `<div class="vcpd-head">● VCPD RESPONSE &nbsp; ${cops.length} UNIT${cops.length === 1 ? '' : 'S'}${state.heliUp ? ' · CONDOR-1 AIR SUPPORT' : ''}</div>`
+          + cops.map((c) => `<div class="vcpd-row"><span>${c.callsign} ${c.officer || ''}</span><span class="vcpd-status">${c.tactic || c.status}</span><span>${c.dist}m</span></div>`).join('')
           + (state.roadblock ? '<div class="vcpd-warn">▲ ROADBLOCK AHEAD — find another way round</div>' : '');
         $('hud-vcpd').style.display = 'block';
       } else {
         $('hud-vcpd').innerHTML = '<div class="vcpd-head">● VCPD RESPONSE &nbsp; 0 UNITS</div><div class="vcpd-row">No units on you — the coast is clear.</div>';
       }
-      // Dialog box with portrait initial.
+      // Sunset Garage shop panel: upgrade levels and next prices.
+      const g = state.garage;
+      if (g) {
+        $('hud-garage').innerHTML = '<div class="vcpd-head">🔧 SUNSET GARAGE — press G in the yard</div>'
+          + GARAGE_UPGRADES.map((def) => {
+            const lvl = (g.upgrades && g.upgrades[def.id]) || 0;
+            const next = (g.nextCosts || []).find((n) => n.id === def.id);
+            return `<div class="vcpd-row"><span>${def.name} Lv${lvl}/3</span><span>${next && next.cost !== null ? '$' + next.cost : 'MAX'}</span></div>`;
+          }).join('')
+          + (state.wrecks ? `<div class="vcpd-row"><span>Wrecks left burning</span><span>${state.wrecks}</span></div>` : '');
+        $('hud-garage').style.display = 'block';
+      }
       if (state.missionGiver && m) {
         $('hud-dialog-text').innerHTML = `<b>${state.missionGiver}</b> — ${m.text}`;
         $('hud-portrait').textContent = state.missionGiver[0];
@@ -186,16 +218,13 @@ export function createHud(city) {
       } else {
         $('hud-dialog').style.display = 'none';
       }
-      // Objective pill under the dialog.
       $('hud-objective').innerHTML = m
         ? `<b>${m.title}</b> — ${m.text}<span class="obj-dist">${Math.round(m.dist)}m</span>`
         : 'Free roam — press Q to start the next story mission';
-      // Speedometer + car condition.
       $('hud-speed').textContent = state.speedKmh || 0;
       $('hud-speed-car').textContent = state.carName ? `${state.carName} · CONDITION ${state.carCondition ?? 100}%` : 'ON FOOT';
       drawMap(mm, 190, state.x, state.z, state);
       if (this.isMapOpen()) drawMap(bm, 640, state.x, state.z, state);
-      // Light drizzle overlay streaks (the morning rain has cleared).
       const w = rain.width = window.innerWidth, h = rain.height = window.innerHeight;
       rainCtx.clearRect(0, 0, w, h);
       rainCtx.strokeStyle = 'rgba(255,220,170,0.16)';

@@ -18,9 +18,28 @@ export function spawnPedestrians(rng, count, cx, cz) {
     peds.push({
       x, z, angle: rng.range(0, Math.PI * 2), speed: rng.range(1.2, 2.4),
       shirt: SHIRTS[rng.int(0, SHIRTS.length - 1)], flee: 0, dead: false, bob: rng.range(0, 6),
+      crew: null,
     });
   }
   return peds;
+}
+
+// The Sunset Kings crew on foot: Lena, Rook and Dario stand near the
+// garage yard and the mission starts, so the crew is visible in the
+// world instead of only named in a panel. Crew members never flee from
+// Mara and never count as bystanders for crimes.
+export function spawnCrew(rng, garage) {
+  if (!garage) return [];
+  const crew = [
+    { name: 'Lena Voss', shirt: [0.9, 0.3, 0.4], dx: -6, dz: 0 },
+    { name: 'Rook', shirt: [0.3, 0.7, 0.95], dx: 6, dz: 2 },
+    { name: 'Dario Kess', shirt: [0.95, 0.8, 0.3], dx: 0, dz: -6 },
+  ];
+  return crew.map((c) => ({
+    x: garage.x + c.dx, z: garage.z + c.dz, angle: rng.range(0, Math.PI * 2),
+    speed: 0, shirt: c.shirt, flee: 0, dead: false, bob: rng.range(0, 6),
+    crew: c.name,
+  }));
 }
 
 export function stepPedestrians(peds, dt, player, cars, gunshot, buildings) {

@@ -37,7 +37,8 @@ const MIME: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-// Vesper City: Golden Hour — serves the game on http://localhost:8080 for local play.
+// Vesper City: Golden Hour — Sunset Kings (v3) — serves the game on http://localhost:8080 for local play.
+// Garage, radio, respect and wrecks are all in the static game/ files; nothing here fetches the network.
 createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://localhost');
   let pathname: string;

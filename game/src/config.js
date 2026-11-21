@@ -1,5 +1,10 @@
-// Vesper City: Golden Hour — shared constants and tuning.
+// Vesper City: Golden Hour — Sunset Kings (v3) — shared constants and tuning.
 // Original game. No Rockstar names, assets or map. All art is procedural.
+// v3 adds the Sunset Garage upgrade shop, three procedural radio stations,
+// the Sunset Kings respect ladder and crew, named VCPD units, and cars
+// that burn and explode. The save key is new so a v3 save never collides
+// with a Golden Hour v2 save.
+export const GAME_TITLE = 'Vesper City: Golden Hour — Sunset Kings';
 export const WORLD = {
   block: 44,          // size of one city block (world units)
   blocks: 9,          // blocks across (city spans blocks*block + roads)
@@ -13,17 +18,21 @@ export const SUN = { x: -293, y: 26, z: 27, color: [1.0, 0.72, 0.28] };
 export const STEP = 1 / 60;
 export const PLAYER = { walkSpeed: 7, sprintSpeed: 11, health: 100, armour: 100, radius: 0.9 };
 export const WANTED_MAX = 5;
-export const SAVE_KEY = 'vesper-city-golden-hour-save-v1';
+export const SAVE_KEY = 'vesper-city-golden-hour-v3-save-v1';
 export const WEAPONS = [
   { id: 'fists', name: 'FISTS', ammo: Infinity, cooldown: 0.35, range: 3 },
   { id: 'pistol', name: 'VESPER 9MM', ammo: 72, cooldown: 0.28, range: 60 },
   { id: 'smg', name: 'MAKO SMG', ammo: 150, cooldown: 0.12, range: 55 },
 ];
+// Every car has a name and a personality: top speed, pull, brakes, grip.
+// The Storm King muscle car is the Sunset Kings' prize — fast, thirsty,
+// and the only car that starts with a full tank of nerve.
 export const CAR_TYPES = [
   { id: 'sedan', name: 'Vesper S', color: [0.72, 0.18, 0.24], top: 24, accel: 16, brake: 30, grip: 2.6 },
   { id: 'coupe', name: 'Sunset GT', color: [0.95, 0.68, 0.18], top: 33, accel: 22, brake: 34, grip: 3.1 },
   { id: 'van', name: 'Hauler XL', color: [0.9, 0.72, 0.18], top: 20, accel: 12, brake: 26, grip: 2.2 },
   { id: 'taxi', name: 'Sunset Cab', color: [0.95, 0.8, 0.1], top: 26, accel: 17, brake: 30, grip: 2.7 },
+  { id: 'muscle', name: 'Storm King', color: [0.55, 0.15, 0.65], top: 36, accel: 24, brake: 32, grip: 2.9 },
 ];
 export const DISTRICTS = [
   { name: 'Sunset Mile', color: '#ff9a3d' },
@@ -41,4 +50,15 @@ export const GOLD = {
   rose: [0.72, 0.42, 0.38],
 };
 export const WINDOW_STRIP = ['#ffd166', '#7dd3fc', '#fda4af', '#fbbf24'];
-export const RADIO_STATIONS = ['VESPER 98.1 · Golden Hour Mix', 'SUNSET FM · Coast Drive', 'STORM RADIO · Weather Band'];
+export const RADIO_STATIONS = ['VESPER 98.1 · Golden Hour Mix', 'SUNSET FM 101.5 · Coast Drive', 'STORM RADIO 87.9 · Weather Band'];
+// Named VCPD units: every cruiser and the helicopter have a callsign, an
+// officer, and a tactic, so the pursuit panel reads like a real dispatch.
+export const VCPD_UNITS = [
+  { callsign: 'VCPD-11', officer: 'Sgt. Reyes', tactic: 'RAM', role: 'Interceptor' },
+  { callsign: 'VCPD-25', officer: 'Ofc. Hale', tactic: 'PIT', role: 'Interceptor' },
+  { callsign: 'VCPD-18', officer: 'Ofc. Cruz', tactic: 'ROADBLOCK', role: 'Blocker' },
+  { callsign: 'VCPD-45', officer: 'Sgt. Okafor', tactic: 'PURSUIT', role: 'Interceptor' },
+  { callsign: 'VCPD-07', officer: 'Ofc. Lind', tactic: 'PURSUIT', role: 'Interceptor' },
+  { callsign: 'VCPD-33', officer: 'Ofc. Voss', tactic: 'RAM', role: 'Interceptor' },
+];
+export const HELI_UNIT = { callsign: 'CONDOR-1', officer: 'Capt. Hale', tactic: 'AIR SUPPORT', role: 'Helicopter' };

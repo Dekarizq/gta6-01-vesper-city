@@ -1,6 +1,9 @@
-// Vesper City: Golden Hour — built by simedhol's recorded session: a raw-WebGL 3D open-world
-// crime game (procedural golden-hour city, driving, stealing, police wanted 0-5 with a visible
-// helicopter, 10 story missions, 3 weapons, armour, building collision).
+// Vesper City: Golden Hour — Sunset Kings (v3) — built by simedhol's recorded session:
+// a raw-WebGL 3D open-world crime game (procedural golden-hour city, driving,
+// carjacking, police wanted 0-5 with named VCPD units and the CONDOR-1
+// helicopter, 10 story missions, 3 weapons, armour, building collision,
+// Sunset Garage upgrades, 3 procedural radio stations, respect ranks and
+// crew, and cars that burn and explode into smoking wrecks).
 // A working gta6-01 entry (Node 22, standard library only): the game is this directory's
 // game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
 // modules, no library and no network request), and the program hands it in. It copies game/ and

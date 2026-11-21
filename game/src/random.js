@@ -1,4 +1,7 @@
-// Seeded random helpers (mulberry32) so staged screenshots are deterministic.
+// Seeded random helpers (mulberry32) so staged screenshots are deterministic,
+// plus the small math helpers the v3 systems share: clamping, lerping,
+// distance, angle wrapping, and a weighted pick for the radio walk and
+// the traffic spawner. Pure functions — safe to import from Node tests.
 export function createRandom(seed) {
   let a = seed >>> 0;
   return {
@@ -11,6 +14,16 @@ export function createRandom(seed) {
     range(min, max) { return min + this.next() * (max - min); },
     int(min, max) { return Math.floor(this.range(min, max + 1)); },
     pick(arr) { return arr[Math.floor(this.next() * arr.length)]; },
+    pickWeighted(pairs) {
+      let total = 0;
+      for (const [, w] of pairs) total += w;
+      let roll = this.next() * total;
+      for (const [v, w] of pairs) {
+        roll -= w;
+        if (roll <= 0) return v;
+      }
+      return pairs[pairs.length - 1][0];
+    },
   };
 }
 export function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
@@ -22,4 +35,20 @@ export function angleLerp(a, b, t) {
   if (d > Math.PI) d -= Math.PI * 2;
   if (d < -Math.PI) d += Math.PI * 2;
   return a + d * t;
+}
+// Wrap an angle into (-PI, PI] so chase steering never spins the long way.
+export function wrapAngle(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a <= -Math.PI) a += Math.PI * 2;
+  return a;
+}
+// A deterministic shuffle (Fisher-Yates on the seeded rng) for the radio
+// walk and for dealing traffic types without repeats in a row.
+export function shuffle(rng, arr) {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = rng.int(0, i);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }

@@ -154,13 +154,19 @@ export function generateCity(rng) {
   for (let i = 0; i < 10; i += 1) {
     umbrellas.push({ x: -size / 2 + 30 + i * (size - 60) / 9 + rng.range(-8, 8), z: beachZ + rng.range(-8, 10), color: rng.pick(['#ff5c5c', '#ffd166', '#7dd3fc', '#fda4af']) });
   }
+  // The Sunset Garage yard (v3): Rook's shop sits on the south-east
+  // corner, a low gold-roofed building with its own sign, so the player
+  // can drive to it, park in the yard, and press G to buy upgrades.
+  const garageX = size / 2 - 60, garageZ = size / 2 - 60;
+  buildings.push({ x: garageX, z: garageZ, w: 30, d: 18, h: 10, color: [0.85, 0.62, 0.28], district: 'Harbor Docks', strip: '#ffd166' });
+  signs.push({ x: garageX, y: 11.5, z: garageZ + 9.4, w: 16, h: 1.8, d: 0.4, color: '#ffd166' });
   const landmarks = [
     { id: 'spire', name: 'Storm Spire', x: 0, z: 0 },
     { id: 'harbor', name: 'Harbor Docks', x: 0, z: size / 2 - 14 },
     { id: 'neonmile', name: 'Sunset Mile', x: -size / 2 + 30, z: -size / 2 + 30 },
     { id: 'rainmarket', name: 'Sunset Shore', x: size / 2 - 30, z: -size / 2 + 60 },
     { id: 'hospital', name: 'St. Mara Hospital', x: -size / 2 + 60, z: size / 2 - 60 },
-    { id: 'garage', name: 'Vesper Garage', x: size / 2 - 60, z: size / 2 - 60 },
+    { id: 'garage', name: 'Sunset Garage', x: garageX, z: garageZ },
   ];
   return { size, lines, buildings, signs, palms, umbrellas, landmarks };
 }

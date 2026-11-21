@@ -282,6 +282,13 @@ export function createEngine(canvas, city) {
   };
 }
 
+// Fire colour for a burning car: it flickers between deep orange and
+// bright gold so a burning wreck reads as fire, not as a painted box.
+export function fireColor(time, base = 1) {
+  const flick = 0.65 + Math.sin(time * 18) * 0.25 + Math.sin(time * 31) * 0.1;
+  return [1, clamp(0.45 * flick * base, 0, 1), 0.08];
+}
+
 // Chase camera: close and low, the player car filling the lower frame.
 export function chaseCamera(px, pz, angle, speed, inCar) {
   const back = inCar ? 9 + speed * 0.12 : 7;

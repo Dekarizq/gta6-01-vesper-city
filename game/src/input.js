@@ -1,6 +1,9 @@
-// input.js — keyboard + mouse. Held keys are read every frame; one-shot
-// presses (enter car, shoot, pause, mission, restart, weapon switch) are
-// queued as flags. Keys 1/2/3 switch between FISTS, VESPER 9MM and MAKO SMG.
+// input.js — keyboard + mouse for Sunset Kings (v3). Held keys are read
+// every frame; one-shot presses are queued as flags. v3 keys: E enter /
+// steal a car, F or click shoot, 1/2/3 switch weapons, G open the Sunset
+// Garage shop when standing in the garage yard, R switch radio station,
+// T restart the mission (R used to restart — it now changes the radio, so
+// restart moved to T), Q start a mission, M map, U mute, P pause.
 export const ACT_ENTER = 1;
 export const ACT_SHOOT = 2;
 export const ACT_PAUSE = 4;
@@ -12,10 +15,13 @@ export const ACT_CONFIRM = 128;
 export const ACT_WEAPON1 = 256;
 export const ACT_WEAPON2 = 512;
 export const ACT_WEAPON3 = 1024;
+export const ACT_GARAGE = 2048;
+export const ACT_RADIO = 4096;
 
 const KEYMAP = {
   KeyE: ACT_ENTER, KeyF: ACT_SHOOT, KeyP: ACT_PAUSE, KeyM: ACT_MAP,
-  KeyR: ACT_RESTART, KeyU: ACT_MUTE, Space: ACT_CONFIRM, Enter: ACT_CONFIRM,
+  KeyT: ACT_RESTART, KeyU: ACT_MUTE, KeyG: ACT_GARAGE, KeyR: ACT_RADIO,
+  Space: ACT_CONFIRM, Enter: ACT_CONFIRM,
 };
 const MISSION_KEYS = new Set(['KeyQ', 'KeyN']);
 

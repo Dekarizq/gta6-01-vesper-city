@@ -1,9 +1,13 @@
-// missions.js — the 10-mission story of Vesper City: Mara Voss, a getaway
-// driver with one week before Hurricane Ilsa drowns the city, works for fixer
-// Dario Kess to buy her way out. Each mission is a chain of go-to steps;
-// finishing one pays cash and unlocks the next. EVERY step sits on a road
-// intersection (roadCross), so building collision can never trap a target —
-// the old (0,0) Storm Spire targets are gone.
+// missions.js — the 10-mission story of the Sunset Kings (v3): Mara Voss,
+// getaway driver with one week before Hurricane Ilsa drowns the city,
+// works for fixer Dario Kess to buy her way out — and along the way she
+// builds a crew and a reputation. Each mission is a chain of go-to steps;
+// finishing one pays cash and respect, and the crew bonuses stack: Lena
+// adds 10% mission cash, Rook cuts garage prices, Dario doubles streaks.
+// EVERY step sits on a road intersection (roadCross), so building
+// collision can never trap a target — the old (0,0) Storm Spire targets
+// are gone. v3 mission 3 now ends at the Sunset Garage, and mission 10
+// is the coronation run: finish it and Mara is the Sunset King.
 import { roadCross } from './city.js';
 
 function pt(x, z, text, kind) { return { x, z, text, kind: kind || 'goto' }; }
@@ -11,44 +15,44 @@ function cross(ix, iz, text, kind) { const p = roadCross(ix, iz); return pt(p.x,
 
 export function buildMissions(city) {
   return [
-    { id: 1, title: 'First Fare', giver: 'Dario Kess', reward: 350,
+    { id: 1, title: 'First Fare', giver: 'Dario Kess', reward: 350, respect: 120,
       intro: 'Dario: "Seven days till the storm, Mara. Drive like you mean it."',
       steps: [cross(1, 1, 'Pick up the courier on Sunset Mile', 'pickup'),
               cross(8, 2, 'Drop the package at Sunset Shore', 'deliver')] },
-    { id: 2, title: 'Rain Courier', giver: 'Dario Kess', reward: 500,
+    { id: 2, title: 'Rain Courier', giver: 'Dario Kess', reward: 500, respect: 120,
       intro: 'A rival crew is watching the docks. Take the long way, fast.',
       steps: [cross(2, 8, 'Collect the storm charts at the hospital corner', 'pickup'),
               cross(5, 9, 'Deliver them to the Harbor Docks', 'deliver')] },
-    { id: 3, title: 'The Getaway', giver: 'Lena Voss', reward: 800,
+    { id: 3, title: 'The Getaway', giver: 'Lena Voss', reward: 800, respect: 150,
       intro: 'Lena: "The crew hit the Glass Quarter vault. Get them out — now."',
       steps: [cross(4, 4, 'Reach the crew at the Glass Quarter corner', 'pickup'),
-              cross(8, 8, 'Lose the heat, then reach the Vesper Garage', 'escape')] },
-    { id: 4, title: 'Storm Chaser', giver: 'Dario Kess', reward: 650,
+              cross(8, 8, 'Lose the heat, then reach the Sunset Garage', 'escape')] },
+    { id: 4, title: 'Storm Chaser', giver: 'Dario Kess', reward: 650, respect: 120,
       intro: 'Drive the weather crew through the flooded south roads.',
       steps: [cross(3, 9, 'Pick up the weather crew by the harbor road', 'pickup'),
               cross(9, 1, 'Reach the Sunset Shore relay station', 'deliver')] },
-    { id: 5, title: 'Rescue Run', giver: 'Lena Voss', reward: 900,
+    { id: 5, title: 'Rescue Run', giver: 'Lena Voss', reward: 900, respect: 150,
       intro: 'A bus is stranded on the bridge in the rising water. Go.',
       steps: [cross(5, 9, 'Reach the stranded bus on the harbor road', 'pickup'),
               cross(2, 8, 'Bring the survivors to St. Mara Hospital', 'deliver')] },
-    { id: 6, title: 'The Vault Job', giver: 'Dario Kess', reward: 1400,
+    { id: 6, title: 'The Vault Job', giver: 'Dario Kess', reward: 1400, respect: 180,
       intro: 'Quiet in, loud out. The Glass Quarter vault holds the storm fund.',
       steps: [cross(5, 5, 'Reach the Glass Quarter vault corner', 'goto'),
-              cross(8, 8, 'Escape with the storm fund', 'escape')] },
-    { id: 7, title: 'Double Cross', giver: 'Rook', reward: 1100,
+              cross(8, 8, 'Escape with the storm fund to the Sunset Garage', 'escape')] },
+    { id: 7, title: 'Double Cross', giver: 'Rook', reward: 1100, respect: 180,
       intro: 'Rook sold you out. Take the ledger back from his crew.',
       steps: [cross(1, 1, 'Confront Rook\'s crew on Sunset Mile', 'eliminate'),
               cross(2, 1, 'Recover the ledger', 'pickup')] },
-    { id: 8, title: 'Blackout', giver: 'Dario Kess', reward: 1300,
+    { id: 8, title: 'Blackout', giver: 'Dario Kess', reward: 1300, respect: 180,
       intro: 'The grid is failing. Escort the repair convoy across town.',
       steps: [cross(1, 8, 'Meet the repair convoy', 'pickup'),
               cross(9, 9, 'Escort them to the east substation', 'deliver')] },
-    { id: 9, title: 'The Last Ferry', giver: 'Lena Voss', reward: 1600,
+    { id: 9, title: 'The Last Ferry', giver: 'Lena Voss', reward: 1600, respect: 200,
       intro: 'One ferry leaves before the hurricane. Get Lena to the docks.',
       steps: [cross(8, 2, 'Pick up Lena at Sunset Shore', 'pickup'),
               cross(5, 9, 'Reach the last ferry at the Harbor Docks', 'deliver')] },
-    { id: 10, title: 'Eye of the Storm', giver: 'Dario Kess', reward: 3000,
-      intro: 'The final score: the storm fund, the spire, the whole city watching.',
+    { id: 10, title: 'Eye of the Storm', giver: 'Dario Kess', reward: 3000, respect: 300,
+      intro: 'The final score: the storm fund, the spire, the whole city watching. Finish this and you are the Sunset King.',
       steps: [cross(4, 5, 'Reach the spire corner in the eye of the storm', 'goto'),
               cross(5, 9, 'Escape to the harbor with the fund', 'escape')] },
   ];

@@ -11,6 +11,10 @@ import { roadCross } from './city.js';
 
 export const SUN_COIN_COUNT = 24;
 export const SUN_COIN_BONUS = 500;
+// v3: every Sun Coin also pays respect — the hunt feeds the Sunset Kings
+// ladder, and a chained streak pays respect on top of cash.
+export const SUN_COIN_RESPECT = 8;
+export const SUN_STREAK_RESPECT = 30;
 export const SUN_COIN_RADIUS = 3.4;
 export const SUN_COIN_DAY_SECONDS = 240;
 // Sun Streak: coins grabbed quickly chain together. Every 6th coin in one

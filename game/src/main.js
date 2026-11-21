@@ -1,12 +1,14 @@
-// main.js — boot and the one loop for Vesper City: Golden Hour.
+// main.js — boot and the one loop for Vesper City: Golden Hour — Sunset Kings.
 // ?shot=start|chase|street|mission stages a deterministic frozen scene and
 // sets window.__shotReady once it has settled, for screenshots. Otherwise the
-// game runs from the title screen: start, drive, steal, run missions, outrun
-// the VCPD, and save — all offline, all procedural, no network requests.
-import { STEP, SAVE_KEY } from './config.js';
+// game runs from the title screen: start, drive, steal, run missions, tune
+// the car at the Sunset Garage, switch radio stations, build respect and a
+// crew, outrun the named VCPD units, and save — all offline, all procedural,
+// no network requests.
+import { STEP, SAVE_KEY, GAME_TITLE } from './config.js';
 import { createRandom } from './random.js';
 import { createGame, SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSED, SCREEN_DEAD } from './world.js';
-import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM, ACT_WEAPON1, ACT_WEAPON2, ACT_WEAPON3 } from './input.js';
+import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM, ACT_WEAPON1, ACT_WEAPON2, ACT_WEAPON3, ACT_GARAGE, ACT_RADIO } from './input.js';
 import { createEngine, chaseCamera, collideCamera } from './engine.js';
 import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
@@ -43,8 +45,8 @@ function startNew() {
   screen = SCREEN_PLAY;
   hud.hideTitle(); hud.hidePause(); hud.hideDead();
   audio.unlock();
-  hud.message('Welcome to Vesper City. The rain has cleared — press Q to start your first mission.', 6);
-  announce('Playing Vesper City.');
+  hud.message('Welcome to Vesper City, Sunset King. Press Q to start your first mission — and find the Sunset Garage when you have cash.', 6);
+  announce('Playing Vesper City: Golden Hour — Sunset Kings.');
 }
 
 function continueSaved() {
@@ -104,6 +106,8 @@ function handleActions() {
   if (a & ACT_WEAPON1) api.changeWeapon(0);
   if (a & ACT_WEAPON2) api.changeWeapon(1);
   if (a & ACT_WEAPON3) api.changeWeapon(2);
+  if (a & ACT_GARAGE) api.cycleGarageUpgrade();
+  if (a & ACT_RADIO) { const s = api.nextRadio(); if (audio.setRadioStation) audio.setRadioStation(s.id); }
   if (a & ACT_MISSION) api.startMission();
   if (a & ACT_RESTART) api.restartMission();
   if (a & ACT_MAP) { game.mapOpen = !game.mapOpen; hud.toggleMap(game.mapOpen); }
@@ -123,7 +127,6 @@ function frame(now) {
   } else if (screen === SCREEN_TITLE) {
     titleOrbit += dt * 0.05;
   }
-  // Camera.
   const p = api.player;
   let cam;
   if (screen === SCREEN_TITLE) {
@@ -141,16 +144,11 @@ function frame(now) {
   if (game.msg) { hud.message(game.msg, 4); game.msg = null; }
   if (shot) {
     shotFrames += 1;
-    // The staged scene is frozen, so 30 frames is plenty for the first
-    // frame to settle (headless SwiftShader is slow).
     if (shotFrames > 30 && !window.__shotReady) window.__shotReady = true;
   }
 }
 
 if (shot) {
-  // Shot mode: stage the frozen scene and hide the title unless it is the
-  // start shot. No simulation steps run: the staged cars, cops and heli
-  // stay exactly where stageShot put them.
   stageShot(shot, api);
   if (shot === 'start') {
     screen = SCREEN_TITLE;
@@ -162,6 +160,6 @@ if (shot) {
   requestAnimationFrame(frame);
 } else {
   hud.showTitle(hasSave());
-  announce('Vesper City: Golden Hour. Press Enter or click Start Engine to play.');
+  announce(GAME_TITLE + '. Press Enter or click Start Engine to play.');
   requestAnimationFrame(frame);
 }
