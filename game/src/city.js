@@ -1,8 +1,9 @@
-// city.js — procedural Vesper City: a rain-soaked neon night metropolis.
-// Grid of blocks separated by roads, a harbor with a bridge on the south edge,
-// a tall Glass Quarter downtown, and neon signs on building faces. Pure data:
-// the engine turns it into geometry, the minimap turns it into a map.
-import { WORLD, DISTRICTS, NEON } from './config.js';
+// city.js — procedural Vesper City at golden hour: warm sand, cream,
+// terracotta and gold towers, a sunset beach with palms and umbrellas on the
+// south shore, and a low sun down the west boulevard. Pure data: the engine
+// turns it into geometry, the minimap turns it into a map. Also owns building
+// collision (circle vs tower footprint) and the sun-visibility ray check.
+import { WORLD, DISTRICTS, GOLD, WINDOW_STRIP, SUN } from './config.js';
 
 export function citySize() {
   return WORLD.blocks * (WORLD.block + WORLD.road) + WORLD.road;
@@ -17,6 +18,12 @@ export function roadLines() {
     lines.push(c);
   }
   return lines;
+}
+
+// An intersection of two road lines, by line index (0..blocks).
+export function roadCross(ix, iz) {
+  const lines = roadLines();
+  return { x: lines[ix], z: lines[iz] };
 }
 
 export function nearestRoadCoord(v) {
@@ -41,16 +48,64 @@ export function districtAt(x, z) {
   const fz = (z + size / 2) / size;
   if (fz > 0.82) return DISTRICTS[1]; // Harbor Docks (south)
   if (fx > 0.36 && fx < 0.64 && fz > 0.3 && fz < 0.7) return DISTRICTS[3]; // Glass Quarter downtown
-  if (fx < 0.3 && fz < 0.4) return DISTRICTS[0]; // Neon Mile NW
-  if (fx > 0.7) return DISTRICTS[4]; // Rainmarket east
+  if (fx < 0.3 && fz < 0.4) return DISTRICTS[0]; // Sunset Mile NW
+  if (fx > 0.7) return DISTRICTS[4]; // Sunset Shore east
   return DISTRICTS[2]; // Old Vesper
 }
+
+// Circle (x,z,r) vs a building footprint: true when they overlap.
+export function hitsBuilding(x, z, r, buildings) {
+  for (const b of buildings) {
+    const dx = Math.max(Math.abs(x - b.x) - b.w / 2, 0);
+    const dz = Math.max(Math.abs(z - b.z) - b.d / 2, 0);
+    if (dx * dx + dz * dz < r * r) return b;
+  }
+  return null;
+}
+
+// Push a circle out of any building it overlaps; returns the corrected point.
+// The push lands 0.05 past the edge: pushing to the exact boundary leaves
+// the circle grazing the footprint in floating point, and the same building
+// would report a hit again forever.
+export function resolveBuildingCollision(x, z, r, buildings) {
+  const MARGIN = 0.05;
+  for (let guard = 0; guard < 8; guard += 1) {
+    const b = hitsBuilding(x, z, r, buildings);
+    if (!b) break;
+    const dx = x - b.x, dz = z - b.z;
+    const px = b.w / 2 + r - Math.abs(dx);
+    const pz = b.d / 2 + r - Math.abs(dz);
+    if (px < pz) x = b.x + (dx >= 0 ? 1 : -1) * (b.w / 2 + r + MARGIN);
+    else z = b.z + (dz >= 0 ? 1 : -1) * (b.d / 2 + r + MARGIN);
+  }
+  return { x, z };
+}
+
+// Is the low sun visible from (x,z)? Walk the ray toward the sun in small
+// steps; any building box taller than the ray at that step hides it.
+export function sunVisibleFrom(x, z, buildings) {
+  const steps = 60;
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    const rx = x + (SUN.x - x) * t;
+    const rz = z + (SUN.z - z) * t;
+    const ry = 2 + (SUN.y - 2) * t;
+    for (const b of buildings) {
+      if (ry < b.h && Math.abs(rx - b.x) < b.w / 2 && Math.abs(rz - b.z) < b.d / 2) return false;
+    }
+  }
+  return true;
+}
+
+const PALETTES = [GOLD.sand, GOLD.cream, GOLD.terracotta, GOLD.gold, GOLD.rose];
 
 export function generateCity(rng) {
   const size = citySize();
   const lines = roadLines();
   const buildings = [];
-  const signs = []; // neon sign boxes: {x,y,z,w,h,d,color}
+  const signs = []; // bright sign boxes: {x,y,z,w,h,d,color}
+  const palms = []; // beach palms: {x,z,h,lean}
+  const umbrellas = []; // beach umbrellas: {x,z,color}
   const pitch = WORLD.block + WORLD.road;
   for (let bx = 0; bx < WORLD.blocks; bx += 1) {
     for (let bz = 0; bz < WORLD.blocks; bz += 1) {
@@ -68,16 +123,14 @@ export function generateCity(rng) {
         const h = harbor ? rng.range(6, 12)
           : downtown ? rng.range(28, 62)
           : rng.range(9, 30);
-        const shade = rng.range(0.9, 1.5);
-        const base = [0.10 * shade + 0.08, 0.12 * shade + 0.09, 0.22 * shade + 0.12];
-        // Glass Quarter towers glow bluer; Neon Mile warmer.
-        const dist = districtAt(cx, cz);
-        if (dist === DISTRICTS[3]) { base[0] = 0.12; base[1] = 0.22; base[2] = 0.42; }
-        if (dist === DISTRICTS[0]) { base[0] = 0.30; base[1] = 0.10; base[2] = 0.28; }
-        buildings.push({ x: cx + ox, z: cz + oz, w, d, h, color: base, district: dist.name });
-        // Neon sign on the tallest face of some buildings.
-        if (rng.next() < 0.55 && h > 10) {
-          const c = rng.pick(NEON);
+        const palette = PALETTES[rng.int(0, PALETTES.length - 1)];
+        const shade = rng.range(0.9, 1.15);
+        const base = [palette[0] * shade, palette[1] * shade, palette[2] * shade];
+        const strip = WINDOW_STRIP[rng.int(0, WINDOW_STRIP.length - 1)];
+        buildings.push({ x: cx + ox, z: cz + oz, w, d, h, color: base, district: districtAt(cx, cz).name, strip });
+        // A bright sign on the tallest face of some buildings.
+        if (rng.next() < 0.5 && h > 10) {
+          const c = rng.pick(['#ff9a3d', '#ffd166', '#fda4af', '#7dd3fc']);
           signs.push({
             x: cx + ox, y: rng.range(h * 0.45, h * 0.85), z: cz + oz + d / 2 + 0.25,
             w: rng.range(3, 8), h: rng.range(0.8, 1.6), d: 0.4, color: c,
@@ -91,17 +144,25 @@ export function generateCity(rng) {
     }
   }
   // Landmarks: the Storm Spire (tallest tower, downtown) and the Harbor Bridge.
-  buildings.push({ x: 0, z: 0, w: 26, d: 26, h: 78, color: [0.14, 0.24, 0.5], district: 'Glass Quarter', spire: true });
+  buildings.push({ x: 0, z: 0, w: 26, d: 26, h: 78, color: [0.55, 0.42, 0.3], district: 'Glass Quarter', spire: true, strip: '#ffd166' });
   signs.push({ x: 0, y: 79, z: 0, w: 1.2, h: 1.2, d: 1.2, color: '#ff3355' });
+  // Sunset beach along the south shore: palms and umbrellas on the sand.
+  const beachZ = size / 2 + 18;
+  for (let i = 0; i < 35; i += 1) {
+    palms.push({ x: -size / 2 + 12 + rng.range(0, size - 24), z: beachZ + rng.range(-14, 14), h: rng.range(7, 11), lean: rng.range(-0.4, 0.4) });
+  }
+  for (let i = 0; i < 10; i += 1) {
+    umbrellas.push({ x: -size / 2 + 30 + i * (size - 60) / 9 + rng.range(-8, 8), z: beachZ + rng.range(-8, 10), color: rng.pick(['#ff5c5c', '#ffd166', '#7dd3fc', '#fda4af']) });
+  }
   const landmarks = [
     { id: 'spire', name: 'Storm Spire', x: 0, z: 0 },
     { id: 'harbor', name: 'Harbor Docks', x: 0, z: size / 2 - 14 },
-    { id: 'neonmile', name: 'Neon Mile', x: -size / 2 + 30, z: -size / 2 + 30 },
-    { id: 'rainmarket', name: 'Rainmarket', x: size / 2 - 30, z: -size / 2 + 60 },
+    { id: 'neonmile', name: 'Sunset Mile', x: -size / 2 + 30, z: -size / 2 + 30 },
+    { id: 'rainmarket', name: 'Sunset Shore', x: size / 2 - 30, z: -size / 2 + 60 },
     { id: 'hospital', name: 'St. Mara Hospital', x: -size / 2 + 60, z: size / 2 - 60 },
     { id: 'garage', name: 'Vesper Garage', x: size / 2 - 60, z: size / 2 - 60 },
   ];
-  return { size, lines, buildings, signs, landmarks };
+  return { size, lines, buildings, signs, palms, umbrellas, landmarks };
 }
 
 // Pick a point on a road near (x,z) — used for spawns and mission targets.

@@ -1,6 +1,8 @@
 // vehicles.js — cars: the player's car, traffic AI, and stealing.
 // Cars live on the 2D ground plane (x,z,angle,speed); the engine draws them
 // as 3D boxes. Traffic follows the road grid and turns at intersections.
+// Police cruisers are white with a red/blue light bar so they read clearly
+// against warm golden-hour roads; each carries a VCPD callsign.
 import { CAR_TYPES } from './config.js';
 import { clamp, dist2, angleLerp } from './random.js';
 import { nearestRoadCoord, roadLines, citySize } from './city.js';
@@ -10,6 +12,7 @@ export function makeCar(type, x, z, angle, opts = {}) {
     type, x, z, angle, speed: 0, color: opts.color || type.color,
     police: !!opts.police, taxi: type.id === 'taxi', driver: opts.driver !== false,
     targetSpeed: opts.targetSpeed ?? 9, turnAt: 0, stuck: 0,
+    callsign: opts.callsign || null, condition: 100,
   };
 }
 
@@ -83,8 +86,9 @@ export function nearestCar(cars, x, z, maxDist) {
 }
 
 // Boxes the engine draws for a car (body + cabin + headlights glow).
+// Police cruisers read white in golden hour, with a red/blue light bar.
 export function carBoxes(car) {
-  const c = car.police ? [0.25, 0.3, 0.48] : car.color;
+  const c = car.police ? [0.93, 0.93, 0.96] : car.color;
   const boxes = [
     { x: car.x, y: 0.55, z: car.z, w: 2.0, h: 0.75, d: 4.4, color: c, yaw: car.angle },
     { x: car.x, y: 1.15, z: car.z - 0.2, w: 1.7, h: 0.6, d: 2.2, color: [0.08, 0.1, 0.16], yaw: car.angle },

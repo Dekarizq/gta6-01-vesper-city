@@ -1,5 +1,6 @@
 // input.js — keyboard + mouse. Held keys are read every frame; one-shot
-// presses (enter car, shoot, pause, mission, restart) are queued as flags.
+// presses (enter car, shoot, pause, mission, restart, weapon switch) are
+// queued as flags. Keys 1/2/3 switch between FISTS, VESPER 9MM and MAKO SMG.
 export const ACT_ENTER = 1;
 export const ACT_SHOOT = 2;
 export const ACT_PAUSE = 4;
@@ -8,6 +9,9 @@ export const ACT_RESTART = 16;
 export const ACT_MAP = 32;
 export const ACT_MUTE = 64;
 export const ACT_CONFIRM = 128;
+export const ACT_WEAPON1 = 256;
+export const ACT_WEAPON2 = 512;
+export const ACT_WEAPON3 = 1024;
 
 const KEYMAP = {
   KeyE: ACT_ENTER, KeyF: ACT_SHOOT, KeyP: ACT_PAUSE, KeyM: ACT_MAP,
@@ -23,6 +27,9 @@ export function createInput() {
     if (event.repeat) return;
     keys.add(event.code);
     if (KEYMAP[event.code]) actions |= KEYMAP[event.code];
+    if (event.code === 'Digit1') actions |= ACT_WEAPON1;
+    if (event.code === 'Digit2') actions |= ACT_WEAPON2;
+    if (event.code === 'Digit3') actions |= ACT_WEAPON3;
     if (MISSION_KEYS.has(event.code)) actions |= ACT_MISSION;
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
   });

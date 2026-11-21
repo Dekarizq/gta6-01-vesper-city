@@ -37,6 +37,7 @@ const MIME: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
+// Vesper City: Golden Hour — serves the game on http://localhost:8080 for local play.
 createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://localhost');
   let pathname: string;
@@ -68,5 +69,5 @@ createServer((request, response) => {
   });
   createReadStream(file).pipe(response);
 }).listen(port, '127.0.0.1', () => {
-  console.log(`game/ is on http://localhost:${port}`);
+  console.log(`Vesper City: Golden Hour — game/ is on http://localhost:${port}`);
 });

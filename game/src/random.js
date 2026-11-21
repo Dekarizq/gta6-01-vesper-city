@@ -14,6 +14,7 @@ export function createRandom(seed) {
   };
 }
 export function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+export function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
 export function lerp(a, b, t) { return a + (b - a) * t; }
 export function dist2(ax, az, bx, bz) { const dx = ax - bx, dz = az - bz; return dx * dx + dz * dz; }
 export function angleLerp(a, b, t) {

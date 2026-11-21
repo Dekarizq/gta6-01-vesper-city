@@ -1,5 +1,6 @@
-// save.js — localStorage save/load for Vesper City: cash, health, position,
-// mission progress, wanted level, garage cars owned, and elapsed days.
+// save.js — localStorage save/load for Vesper City: cash, health, armour,
+// weapon loadout, position, mission progress, wanted level, garage cars
+// owned, and elapsed days.
 import { SAVE_KEY } from './config.js';
 
 export function hasSave() {
@@ -8,7 +9,8 @@ export function hasSave() {
 
 export function saveGame(state) {
   const data = {
-    cash: state.cash, health: state.health,
+    cash: state.cash, health: state.health, armour: state.player.armour,
+    weapon: state.combat.weapon, ammo: state.combat.ammo,
     x: state.player.x, z: state.player.z, angle: state.player.angle,
     missionIndex: state.missions.index, missionDone: state.missions.done,
     wanted: state.police.wanted, elapsed: state.elapsed,

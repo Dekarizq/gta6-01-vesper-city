@@ -1,14 +1,17 @@
 // world.js — the game itself: player state, the loop's update, and how every
 // system (driving, stealing, police, missions, combat, storm clock) fits
 // together. No drawing here except collecting the boxes the engine renders.
-import { WORLD, PLAYER, STEP } from './config.js';
+// Golden Hour: building collision keeps cars and pedestrians out of towers,
+// armour absorbs damage before health, and the HUD state carries everything
+// the dense rank-1-style HUD needs (weapons, armour, speed, VCPD callsigns).
+import { WORLD, PLAYER, STEP, WEAPONS, RADIO_STATIONS } from './config.js';
 import { clamp, dist2, angleLerp } from './random.js';
-import { generateCity, citySize, isOnRoad, roadPointNear } from './city.js';
+import { generateCity, citySize, isOnRoad, roadPointNear, resolveBuildingCollision, sunVisibleFrom } from './city.js';
 import { makeCar, spawnTraffic, stepTraffic, stepPlayerCar, nearestCar, carBoxes } from './vehicles.js';
 import { spawnPedestrians, stepPedestrians, pedBoxes } from './pedestrians.js';
-import { createPolice, addWanted, stepPolice, heliBoxes } from './police.js';
+import { createPolice, addWanted, stepPolice, heliBoxes, copStatus } from './police.js';
 import { buildMissions, createMissionState, currentMission, currentStep, updateMission } from './missions.js';
-import { createCombat, shoot, punch, stepCombat } from './combat.js';
+import { createCombat, shoot, punch, stepCombat, switchWeapon, currentWeapon } from './combat.js';
 
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -20,22 +23,24 @@ export function createGame(rng) {
   const missions = buildMissions(city);
   const size = citySize();
   const player = {
-    x: 0, z: 40, angle: 0, speed: 0, health: PLAYER.health,
+    x: 0, z: 40, angle: 0, speed: 0, health: PLAYER.health, armour: PLAYER.armour,
     inCar: false, car: null, armed: true, hurtFlash: 0,
   };
   const game = {
     city, missions: createMissionState(missions), police: createPolice(), combat: createCombat(),
     player, cash: 250, elapsed: 0, time: 0, screen: SCREEN_TITLE,
     traffic: [], peds: [], garage: ['sedan'], ramTimer: 0,
-    msg: null, gunshot: false, mapOpen: false, muted: false,
+    msg: null, gunshot: false, mapOpen: false, muted: false, frozen: false,
     stats: { carsStolen: 0, missionsDone: 0, kills: 0 },
+    sunClear: sunVisibleFrom(0, 27, city.buildings),
   };
   game.traffic = spawnTraffic(rng, 16, player.x, player.z);
   game.peds = spawnPedestrians(rng, 26, player.x, player.z);
 
   function reset(newGame) {
     player.x = 0; player.z = 40; player.angle = 0; player.speed = 0;
-    player.health = PLAYER.health; player.inCar = false; player.car = null;
+    player.health = PLAYER.health; player.armour = PLAYER.armour;
+    player.inCar = false; player.car = null;
     game.cash = 250; game.elapsed = 0;
     game.missions = createMissionState(missions);
     game.police = createPolice();
@@ -49,10 +54,13 @@ export function createGame(rng) {
   function applySave(data) {
     player.x = data.x; player.z = data.z; player.angle = data.angle || 0;
     player.health = data.health ?? 100;
+    player.armour = data.armour ?? 100;
     game.cash = data.cash ?? 250;
     game.elapsed = data.elapsed || 0;
     game.missions.index = data.missionIndex || 0;
     game.missions.done = data.missionDone || 0;
+    game.combat.weapon = data.weapon ?? 1;
+    if (Array.isArray(data.ammo)) game.combat.ammo = data.ammo;
     game.police.wanted = data.wanted || 0;
     game.garage = data.garage || ['sedan'];
     game.traffic = spawnTraffic(rng, 16, player.x, player.z);
@@ -103,8 +111,16 @@ export function createGame(rng) {
 
   function fireWeapon() {
     if (player.inCar) return; // no drive-by shooting in this build
+    const weapon = currentWeapon(game.combat);
+    if (game.combat.weapon === 0) {
+      const hit = punch(player, game.peds);
+      game.combat.shotsFired += 1;
+      if (hit) { addWanted(game.police, 1); game.msg = 'You knocked a bystander down.'; }
+      return;
+    }
     const hit = shoot(game.combat, player, game.peds, game.police.cops, game.time);
     if (!hit) return;
+    if (hit.kind === 'dry') { game.msg = weapon.name + ' is empty — press 1 for fists or find ammo.'; return; }
     game.gunshot = true;
     if (hit.kind === 'cop') {
       game.police.cops = game.police.cops.filter((c) => c !== hit.ref);
@@ -116,7 +132,15 @@ export function createGame(rng) {
     }
   }
 
+  function changeWeapon(index) {
+    if (switchWeapon(game.combat, index)) {
+      game.msg = 'Weapon: ' + WEAPONS[index].name + '.';
+    }
+  }
+
   function step(dt, input, audio) {
+    // Frozen scenes (screenshot staging) do not advance at all.
+    if (game.frozen) return;
     game.time += dt;
     game.elapsed += dt;
     game.gunshot = false;
@@ -125,6 +149,10 @@ export function createGame(rng) {
     // --- movement ---
     if (p.inCar && p.car) {
       stepPlayerCar(p.car, input, dt);
+      // Building collision: the car slides along tower footprints.
+      const fixed = resolveBuildingCollision(p.car.x, p.car.z, 2.2, game.city.buildings);
+      if (fixed.x !== p.car.x || fixed.z !== p.car.z) p.car.speed *= 0.4;
+      p.car.x = fixed.x; p.car.z = fixed.z;
       p.x = p.car.x; p.z = p.car.z; p.angle = p.car.angle; p.speed = p.car.speed;
       // Running over pedestrians is a crime.
       for (const ped of game.peds) {
@@ -164,6 +192,8 @@ export function createGame(rng) {
       const half = citySize() / 2 + 30;
       p.x = clamp(p.x, -half, half);
       p.z = clamp(p.z, -half, half);
+      const fixed = resolveBuildingCollision(p.x, p.z, PLAYER.radius, game.city.buildings);
+      p.x = fixed.x; p.z = fixed.z;
     }
     // --- world life ---
     for (const car of game.traffic) stepTraffic(car, dt, rng);
@@ -173,7 +203,7 @@ export function createGame(rng) {
       game.traffic.push(...extra);
     }
     game.traffic = game.traffic.filter((c) => dist2(c.x, c.z, p.x, p.z) < 220 * 220);
-    stepPedestrians(game.peds, dt, p, game.traffic.concat(game.police.cops), game.gunshot);
+    stepPedestrians(game.peds, dt, p, game.traffic.concat(game.police.cops), game.gunshot, game.city.buildings);
     if (game.peds.filter((x) => !x.dead).length < 18) {
       game.peds.push(...spawnPedestrians(rng, 4, p.x, p.z));
     }
@@ -206,8 +236,8 @@ export function createGame(rng) {
         game.msg += ` Garage unlocked a ${u}!`;
       }
     }
-    // --- storm: rain intensifies as the week runs out ---
-    game.rain = clamp(0.4 + (game.elapsed / (WORLD.dayLength * WORLD.stormDays)) * 0.6, 0.4, 1);
+    // --- golden hour: the morning rain has cleared to a light drizzle ---
+    game.rain = clamp(0.12 + (game.elapsed / (WORLD.dayLength * WORLD.stormDays)) * 0.1, 0.12, 0.25);
     // --- death ---
     if (p.health <= 0) {
       game.screen = SCREEN_DEAD;
@@ -240,24 +270,24 @@ export function createGame(rng) {
         boxes.push({ x: p.x + Math.sin(p.angle) * 0.5, y: 0.9, z: p.z + Math.cos(p.angle) * 0.5, w: 0.15, h: 0.15, d: 0.9, color: [0.15, 0.15, 0.18], yaw: p.angle });
       }
     }
-    // Mission marker: glowing beacon pillar + floating diamond.
+    // Mission marker: a tall glowing beacon pillar + floating diamond.
     const step = currentStep(game.missions);
     if (game.missions.active && step) {
       const pulse = 1 + Math.sin(time * 3) * 0.25;
       boxes.push(
-        { x: step.x, y: 6, z: step.z, w: 1.2 * pulse, h: 12, d: 1.2 * pulse, color: [1, 0.18, 0.53], yaw: 0 },
-        { x: step.x, y: 2.5 + Math.sin(time * 2) * 0.4, z: step.z, w: 1.6, h: 1.6, d: 1.6, color: [1, 0.85, 0.2], yaw: time },
+        { x: step.x, y: 9, z: step.z, w: 2.4 * pulse, h: 18, d: 2.4 * pulse, color: [1, 0.18, 0.53], yaw: 0 },
+        { x: step.x, y: 3.2 + Math.sin(time * 2) * 0.4, z: step.z, w: 2.6, h: 2.6, d: 2.6, color: [1, 0.85, 0.2], yaw: time },
       );
     }
-    // Roadblock cars.
+    // Roadblock cars: white cruisers parked across the road.
     if (game.police.roadblock) {
       const rb = game.police.roadblock;
       boxes.push(
-        { x: rb.x, y: 0.55, z: rb.z, w: 2.0, h: 0.75, d: 4.4, color: [0.08, 0.12, 0.2], yaw: rb.angle },
-        { x: rb.x + 6, y: 0.55, z: rb.z + 2, w: 2.0, h: 0.75, d: 4.4, color: [0.08, 0.12, 0.2], yaw: rb.angle },
+        { x: rb.x, y: 0.55, z: rb.z, w: 2.0, h: 0.75, d: 4.4, color: [0.93, 0.93, 0.96], yaw: rb.angle },
+        { x: rb.x + 6, y: 0.55, z: rb.z + 2, w: 2.0, h: 0.75, d: 4.4, color: [0.93, 0.93, 0.96], yaw: rb.angle },
       );
     }
-    boxes.push(...heliBoxes(game.police.heli, time));
+    boxes.push(...heliBoxes(game.police.heli, time, player));
     // Muzzle flash.
     if (game.combat.muzzle > 0) {
       boxes.push({ x: p.x + Math.sin(p.angle) * 1.2, y: 1.0, z: p.z + Math.cos(p.angle) * 1.2, w: 0.6, h: 0.6, d: 0.6, color: [1, 0.9, 0.4], yaw: 0 });
@@ -268,13 +298,26 @@ export function createGame(rng) {
   function hudState() {
     const step = currentStep(game.missions);
     const m = currentMission(game.missions);
+    const weapon = currentWeapon(game.combat);
     return {
-      cash: game.cash, health: Math.round(player.health),
+      cash: game.cash, health: Math.round(player.health), armour: Math.round(player.armour || 0),
       wanted: game.police.wanted, elapsed: game.elapsed,
       x: player.x, z: player.z, angle: player.angle,
+      speedKmh: Math.round(Math.abs(player.speed || 0) * 3.2),
       carName: player.inCar && player.car ? player.car.type.name : null,
-      cops: game.police.cops,
+      carCondition: player.inCar && player.car ? Math.round(player.car.condition ?? 100) : null,
+      cops: game.police.cops.map((c) => ({
+        callsign: c.callsign || 'VCPD', status: copStatus(c, player),
+        dist: Math.round(Math.sqrt(dist2(c.x, c.z, player.x, player.z))),
+      })),
+      heliUp: !!game.police.heli,
+      roadblock: !!game.police.roadblock,
+      weapons: WEAPONS.map((w, i) => ({ name: w.name, ammo: game.combat.ammo[i], active: i === game.combat.weapon })),
+      weaponName: weapon.name,
+      missionIndex: game.missions.index, missionTotal: game.missions.list.length,
+      missionGiver: m ? m.giver : null,
       missionStep: game.missions.active ? step : null,
+      radio: RADIO_STATIONS[Math.floor(game.elapsed / 60) % RADIO_STATIONS.length],
       objective: game.missions.active && m && step ? {
         title: m.title,
         text: step.text,
@@ -285,15 +328,15 @@ export function createGame(rng) {
 
   function respawn() {
     const hosp = game.city.landmarks.find((l) => l.id === 'hospital');
-    player.x = hosp.x; player.z = hosp.z; player.health = 60;
+    player.x = hosp.x; player.z = hosp.z; player.health = 60; player.armour = 50;
     player.inCar = false; player.car = null;
     game.police = createPolice();
     game.screen = SCREEN_PLAY;
-    game.msg = 'Mara wakes up at St. Mara Hospital. The city keeps raining.';
+    game.msg = 'Mara wakes up at St. Mara Hospital. The rain has cleared — the coast is gold.';
   }
 
   return {
     game, player, city, reset, applySave, startMission, restartMission,
-    enterCar, fireWeapon, step, collectBoxes, hudState, respawn,
+    enterCar, fireWeapon, changeWeapon, step, collectBoxes, hudState, respawn,
   };
 }

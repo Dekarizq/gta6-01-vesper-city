@@ -1,7 +1,8 @@
 // pedestrians.js — people on the sidewalks: walkers, runners, and the
-// occasional victim of the player's crimes. They flee from gunfire and cars.
+// occasional victim of the player's crimes. They flee from gunfire and cars,
+// and building collision keeps them out of towers just like the player.
 import { clamp, dist2 } from './random.js';
-import { citySize, nearestRoadCoord } from './city.js';
+import { citySize, nearestRoadCoord, resolveBuildingCollision } from './city.js';
 
 const SHIRTS = [
   [0.9, 0.3, 0.4], [0.3, 0.7, 0.95], [0.95, 0.8, 0.3], [0.4, 0.85, 0.5],
@@ -22,7 +23,7 @@ export function spawnPedestrians(rng, count, cx, cz) {
   return peds;
 }
 
-export function stepPedestrians(peds, dt, player, cars, gunshot) {
+export function stepPedestrians(peds, dt, player, cars, gunshot, buildings) {
   for (const p of peds) {
     if (p.dead) continue;
     // Flee from the player when they are armed/dangerous, from gunfire, or from a fast car.
@@ -47,6 +48,10 @@ export function stepPedestrians(peds, dt, player, cars, gunshot) {
     if (p.flee <= 0 && Math.random() < dt * 0.2) p.angle += (Math.random() - 0.5) * 2.4;
     p.x += Math.sin(p.angle) * p.speed * dt;
     p.z += Math.cos(p.angle) * p.speed * dt;
+    if (buildings) {
+      const fixed = resolveBuildingCollision(p.x, p.z, 0.6, buildings);
+      p.x = fixed.x; p.z = fixed.z;
+    }
     p.bob += dt * 6;
     const half = citySize() / 2 - 3;
     if (Math.abs(p.x) > half || Math.abs(p.z) > half) p.angle += Math.PI;

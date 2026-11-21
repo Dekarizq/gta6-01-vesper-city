@@ -1,5 +1,7 @@
-// audio.js — procedural WebAudio: rain noise, engine hum, sirens, gunshots,
-// mission chimes. No audio files; everything is synthesized. Mute with U.
+// audio.js — procedural WebAudio: light drizzle noise, engine hum, sirens,
+// gunshots, mission chimes. No audio files; everything is synthesized.
+// Golden Hour: the morning rain has cleared to a soft drizzle, so the rain
+// bed is quieter and higher (a light patter, not a downpour). Mute with U.
 export function createAudio() {
   let ctx = null, master = null, rainGain = null, engineOsc = null, engineGain = null;
   let sirenOsc = null, sirenGain = null, muted = false, started = false;
@@ -16,8 +18,8 @@ export function createAudio() {
       const data = buf.getChannelData(0);
       for (let i = 0; i < len; i += 1) data[i] = Math.random() * 2 - 1;
       const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-      const filt = ctx.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 1400;
-      rainGain = ctx.createGain(); rainGain.gain.value = 0.10;
+      const filt = ctx.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 2400;
+      rainGain = ctx.createGain(); rainGain.gain.value = 0.04;
       src.connect(filt); filt.connect(rainGain); rainGain.connect(master); src.start();
       // Engine: sawtooth whose pitch follows speed.
       engineOsc = ctx.createOscillator(); engineOsc.type = 'sawtooth'; engineOsc.frequency.value = 55;
@@ -47,7 +49,7 @@ export function createAudio() {
         sirenGain.gain.value = 0.03 + wanted * 0.008;
       } else sirenGain.gain.value = 0;
     },
-    setRain(intensity) { if (rainGain) rainGain.gain.value = 0.05 + intensity * 0.09; },
+    setRain(intensity) { if (rainGain) rainGain.gain.value = 0.02 + intensity * 0.05; },
     shot() {
       if (!ctx) return;
       const t = ctx.currentTime;

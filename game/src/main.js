@@ -1,12 +1,12 @@
-// main.js — boot and the one loop for Vesper City: Neon Rain.
-// ?shot=start|chase|street|mission stages a deterministic scene and sets
-// window.__shotReady once it has settled, for screenshots. Otherwise the game
-// runs from the title screen: start, drive, steal, run missions, outrun the
-// VCPD, and save — all offline, all procedural, no network requests.
+// main.js — boot and the one loop for Vesper City: Golden Hour.
+// ?shot=start|chase|street|mission stages a deterministic frozen scene and
+// sets window.__shotReady once it has settled, for screenshots. Otherwise the
+// game runs from the title screen: start, drive, steal, run missions, outrun
+// the VCPD, and save — all offline, all procedural, no network requests.
 import { STEP, SAVE_KEY } from './config.js';
 import { createRandom } from './random.js';
 import { createGame, SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSED, SCREEN_DEAD } from './world.js';
-import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM } from './input.js';
+import { createInput, ACT_ENTER, ACT_SHOOT, ACT_PAUSE, ACT_MISSION, ACT_RESTART, ACT_MAP, ACT_MUTE, ACT_CONFIRM, ACT_WEAPON1, ACT_WEAPON2, ACT_WEAPON3 } from './input.js';
 import { createEngine, chaseCamera, collideCamera } from './engine.js';
 import { createHud } from './hud.js';
 import { createAudio } from './audio.js';
@@ -16,7 +16,7 @@ import { stageShot } from './shots.js';
 const params = new URLSearchParams(window.location.search);
 const shot = params.get('shot');
 const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
-const seed = Number.isInteger(seedParam) ? seedParam : 20261120;
+const seed = Number.isInteger(seedParam) ? seedParam : 20261121;
 
 const canvas = document.getElementById('game');
 const status = document.getElementById('status');
@@ -43,7 +43,7 @@ function startNew() {
   screen = SCREEN_PLAY;
   hud.hideTitle(); hud.hidePause(); hud.hideDead();
   audio.unlock();
-  hud.message('Welcome to Vesper City. Press Q to start your first mission.', 6);
+  hud.message('Welcome to Vesper City. The rain has cleared — press Q to start your first mission.', 6);
   announce('Playing Vesper City.');
 }
 
@@ -101,6 +101,9 @@ function handleActions() {
   if (screen !== SCREEN_PLAY) return;
   if (a & ACT_ENTER) api.enterCar();
   if (a & ACT_SHOOT) { api.fireWeapon(); audio.unlock(); audio.shot(); }
+  if (a & ACT_WEAPON1) api.changeWeapon(0);
+  if (a & ACT_WEAPON2) api.changeWeapon(1);
+  if (a & ACT_WEAPON3) api.changeWeapon(2);
   if (a & ACT_MISSION) api.startMission();
   if (a & ACT_RESTART) api.restartMission();
   if (a & ACT_MAP) { game.mapOpen = !game.mapOpen; hud.toggleMap(game.mapOpen); }
@@ -112,7 +115,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - (frame.last || now)) / 1000 || STEP);
   frame.last = now;
   handleActions();
-  if (screen === SCREEN_PLAY) {
+  if (screen === SCREEN_PLAY && !game.frozen) {
     api.step(dt, input, audio);
     if (game.screen === SCREEN_DEAD) { screen = SCREEN_DEAD; hud.showDead(); }
     autosaveTimer += dt;
@@ -138,14 +141,16 @@ function frame(now) {
   if (game.msg) { hud.message(game.msg, 4); game.msg = null; }
   if (shot) {
     shotFrames += 1;
-    // 30 frames is enough for the scene to settle (headless SwiftShader is slow).
+    // The staged scene is frozen, so 30 frames is plenty for the first
+    // frame to settle (headless SwiftShader is slow).
     if (shotFrames > 30 && !window.__shotReady) window.__shotReady = true;
   }
 }
 
 if (shot) {
-  // Shot mode: stage the scene, hide the title unless it is the start shot,
-  // and run the live loop so traffic, rain and the helicopter move.
+  // Shot mode: stage the frozen scene and hide the title unless it is the
+  // start shot. No simulation steps run: the staged cars, cops and heli
+  // stay exactly where stageShot put them.
   stageShot(shot, api);
   if (shot === 'start') {
     screen = SCREEN_TITLE;
@@ -153,16 +158,10 @@ if (shot) {
   } else {
     screen = SCREEN_PLAY;
     hud.hideTitle();
-    // Drive the chase/mission scenes forward so cops and the helicopter appear.
-    // The chase gets a short sim and no throttle so the staged cruisers stay
-    // in frame ahead; other scenes drive forward.
-    const simSteps = shot === 'chase' ? 60 : 240;
-    const simInput = { forward: () => (shot === 'chase' ? 0 : 1), steer: () => 0, sprint: () => false, handbrake: () => false };
-    for (let i = 0; i < simSteps; i += 1) api.step(STEP, simInput, null);
   }
   requestAnimationFrame(frame);
 } else {
   hud.showTitle(hasSave());
-  announce('Vesper City: Neon Rain. Press Enter or click Start Engine to play.');
+  announce('Vesper City: Golden Hour. Press Enter or click Start Engine to play.');
   requestAnimationFrame(frame);
 }
